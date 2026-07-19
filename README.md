@@ -46,7 +46,7 @@ A highly customizable, modern offline-first Single Page Application (SPA) and Pr
 <!-- TODO: Add installation and setup instructions once project is finalized and stable -->
 
 ## 🗺️ Project Roadmap
-- [ ] Initialize Vite React + TypeScript template.
+- [x] Initialize Vite React + TypeScript template.
 - [ ] Setup shadcn/ui, styling, and theme configuration.
 - [ ] Configure PWA support (`vite-plugin-pwa`, web manifest, icons).
 - [ ] Implement deck management and flashcard creation workflows.
