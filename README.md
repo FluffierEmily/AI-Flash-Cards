@@ -38,7 +38,7 @@ A highly customizable, modern offline-first Single Page Application (SPA) and Pr
 ## 🚀 Getting Started
 
 ### 📋 Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher)
+- [Node.js](https://nodejs.org/) (v24 or higher)
 - [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
 
 ### ⚙️ Installation & Setup
