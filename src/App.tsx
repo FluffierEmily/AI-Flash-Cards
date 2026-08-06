@@ -12,6 +12,7 @@ import {
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypto"
 import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "./lib/db"
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
+import { useFcm } from "./components/drawers/FcmDrawer"
 import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
 import { DummyFlashCard } from "./components/DummyFlashCard"
 import { DummyDecks, INITIAL_DECKS, type Deck } from "./components/DummyDecks"
@@ -156,18 +157,7 @@ export default function App() {
   })
 
   // FCM State
-  const [isFcmEnabled, setIsFcmEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_enabled") === "true" || (typeof Notification !== "undefined" && Notification.permission === "granted")
-    }
-    return false
-  })
-  const [fcmToken, setFcmToken] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_token")
-    }
-    return null
-  })
+  const { isFcmEnabled, fcmToken, handleEnableFcm, handleDisableFcm } = useFcm()
 
 
   // Theme Sync
@@ -193,15 +183,50 @@ export default function App() {
       .catch((err) => console.error("Error loading key from IndexedDB:", err))
   }, [])
 
-  // PWA Prompt Listener
+  // PWA Prompt & Install Listener
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e)
     }
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true)
+      localStorage.setItem("pwa_installed", "true")
+      setDeferredPrompt(null)
+    }
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    window.addEventListener("appinstalled", handleAppInstalled)
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("appinstalled", handleAppInstalled)
+    }
   }, [])
+
+  // Listen for changes in PWA standalone display mode
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(display-mode: standalone)")
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      setIsPwaInstalled(e.matches || localStorage.getItem("pwa_installed") === "true")
+    }
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleMediaChange)
+    } else {
+      mediaQuery.addListener(handleMediaChange)
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", handleMediaChange)
+      } else {
+        mediaQuery.removeListener(handleMediaChange)
+      }
+    }
+  }, [])
+
 
   // Auto Notice Tooltip on Page Loaded
   const [autoNoticeStep, setAutoNoticeStep] = useState<"pwa" | "apiKey" | "fcm" | null>(null)
@@ -296,33 +321,7 @@ export default function App() {
     }
   }
 
-  // FCM Enable Handler
-  const handleEnableFcm = async () => {
-    if (typeof Notification !== "undefined") {
-      const permission = await Notification.requestPermission()
-      if (permission === "granted") {
-        const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
-        setFcmToken(mockToken)
-        localStorage.setItem("fcm_token", mockToken)
-        setIsFcmEnabled(true)
-        localStorage.setItem("fcm_enabled", "true")
-        return
-      }
-    }
-    // Simulation fallback
-    const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
-    setFcmToken(mockToken)
-    localStorage.setItem("fcm_token", mockToken)
-    setIsFcmEnabled(true)
-    localStorage.setItem("fcm_enabled", "true")
-  }
 
-  const handleDisableFcm = () => {
-    setIsFcmEnabled(false)
-    setFcmToken(null)
-    localStorage.removeItem("fcm_token")
-    localStorage.setItem("fcm_enabled", "false")
-  }
 
   const totalReviewsDue = decks.filter(d => d.enabled).reduce((acc, deck) => acc + deck.due, 0)
 
@@ -569,6 +568,7 @@ export default function App() {
         }}
         pwaProps={{
           isPwaInstalled,
+          canInstallDirectly: !!deferredPrompt,
           handleInstallPwa
         }}
         fcmProps={{

@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Bell } from "lucide-react"
 
 export interface FcmDrawerProps {
@@ -5,6 +6,58 @@ export interface FcmDrawerProps {
   fcmToken: string | null
   handleEnableFcm: () => void
   handleDisableFcm: () => void
+}
+
+export function useFcm() {
+  const [isFcmEnabled, setIsFcmEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const isEnabled = localStorage.getItem("fcm_enabled") === "true"
+      const hasToken = !!localStorage.getItem("fcm_token")
+      const hasPermission = typeof Notification !== "undefined" && Notification.permission === "granted"
+      return isEnabled && hasToken && hasPermission
+    }
+    return false
+  })
+
+  const [fcmToken, setFcmToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fcm_token")
+    }
+    return null
+  })
+
+  const handleEnableFcm = async () => {
+    if (typeof Notification !== "undefined") {
+      const permission = await Notification.requestPermission()
+      if (permission === "granted") {
+        const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
+        setFcmToken(mockToken)
+        localStorage.setItem("fcm_token", mockToken)
+        setIsFcmEnabled(true)
+        localStorage.setItem("fcm_enabled", "true")
+        return
+      }
+    }
+    const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
+    setFcmToken(mockToken)
+    localStorage.setItem("fcm_token", mockToken)
+    setIsFcmEnabled(true)
+    localStorage.setItem("fcm_enabled", "true")
+  }
+
+  const handleDisableFcm = () => {
+    setIsFcmEnabled(false)
+    setFcmToken(null)
+    localStorage.removeItem("fcm_token")
+    localStorage.setItem("fcm_enabled", "false")
+  }
+
+  return {
+    isFcmEnabled,
+    fcmToken,
+    handleEnableFcm,
+    handleDisableFcm
+  }
 }
 
 export function FcmDrawer({
