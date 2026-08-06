@@ -49,7 +49,7 @@ A highly customizable, modern offline-first Single Page Application (SPA) and Pr
 - [x] Initialize Vite React + TypeScript template.
 - [x] Setup shadcn/ui, styling, and theme configuration.
 - [x] Homepage layout (landing page) with dummy buttons.
-- [ ] Configure PWA support (`vite-plugin-pwa`, web manifest, icons).
+- [x] Configure PWA support (`vite-plugin-pwa`, web manifest, icons).
 - [ ] Implement deck management and flashcard creation workflows.
 - [ ] Build the interactive review session UI (card viewer, keyboard controls).
 - [ ] Integrate local spaced repetition scheduling logic.
