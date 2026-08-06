@@ -1,0 +1,104 @@
+/* TipTap ProseMirror styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100px;
+  padding: 1rem;
+}
+
+.ProseMirror p {
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror code {
+  background-color: hsla(var(--secondary), 0.8);
+  color: hsl(var(--primary));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.875em;
+}
+
+.ProseMirror pre {
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-family: monospace;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+
+.ProseMirror pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875rem;
+}
+
+/* Syntax highlighting (Catppuccin Mocha themed) */
+.ProseMirror pre .hljs-comment,
+.ProseMirror pre .hljs-quote {
+  color: #6c7086;
+  font-style: italic;
+}
+
+.ProseMirror pre .hljs-keyword,
+.ProseMirror pre .hljs-selector-tag,
+.ProseMirror pre .hljs-literal,
+.ProseMirror pre .hljs-section,
+.ProseMirror pre .hljs-link {
+  color: #cba6f7;
+  font-weight: 600;
+}
+
+.ProseMirror pre .hljs-string,
+.ProseMirror pre .hljs-doctag,
+.ProseMirror pre .hljs-regexp {
+  color: #a6e3a1;
+}
+
+.ProseMirror pre .hljs-number,
+.ProseMirror pre .hljs-variable,
+.ProseMirror pre .hljs-template-variable,
+.ProseMirror pre .hljs-type,
+.ProseMirror pre .hljs-tag,
+.ProseMirror pre .hljs-name,
+.ProseMirror pre .hljs-attribute,
+.ProseMirror pre .hljs-symbol,
+.ProseMirror pre .hljs-bullet,
+.ProseMirror pre .hljs-addition {
+  color: #f9e2af;
+}
+
+.ProseMirror pre .hljs-title,
+.ProseMirror pre .hljs-class,
+.ProseMirror pre .hljs-function,
+.ProseMirror pre .hljs-title.function_ {
+  color: #89b4fa;
+}
+
+.ProseMirror pre .hljs-params {
+  color: #cdd6f4;
+}
+
+.ProseMirror pre .hljs-built_in,
+.ProseMirror pre .hljs-bullet {
+  color: #fab387;
+}

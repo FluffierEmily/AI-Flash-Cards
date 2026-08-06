@@ -3,54 +3,83 @@ import {
   Sun,
   Moon,
   Sparkles,
-  Layers,
-  GraduationCap,
-  TrendingUp,
-  Plus,
-  ChevronRight,
-  RefreshCw,
-  CheckCircle2,
-  BookOpen,
-  ArrowRight,
-  Database,
-  CloudLightning
+  Settings,
+  Key,
+  Smartphone,
+  Bell,
+  Info
 } from "lucide-react"
-
-interface Flashcard {
-  id: string
-  question: string
-  answer: string
-  category: string
-  difficulty: "Easy" | "Medium" | "Hard"
-}
-
-const SAMPLE_CARDS: Flashcard[] = [
-  {
-    id: "1",
-    category: "Architecture",
-    difficulty: "Medium",
-    question: "What is Spaced Repetition?",
-    answer: "A learning technique where flashcards are scheduled for review at increasing intervals based on how well you remember them. It exploits the psychological spacing effect to maximize retention."
-  },
-  {
-    id: "2",
-    category: "PWA",
-    difficulty: "Easy",
-    question: "Explain Offline-First Architecture",
-    answer: "A design pattern where all data read/write operations are performed against a local database (like IndexedDB) first. Background synchronization handles syncing with server endpoints when online, ensuring the app works without internet."
-  },
-  {
-    id: "3",
-    category: "AI & LLMs",
-    difficulty: "Hard",
-    question: "How does AI scoring improve traditional flashcards?",
-    answer: "Traditional cards rely on binary self-grading. AI evaluation analyzes free-form or spoken answers for accuracy, semantic correctness, and completeness, providing detailed corrective feedback."
-  }
-]
+import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypto"
+import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "./lib/db"
+import { SetupDrawer } from "./components/drawers/SetupDrawer"
+import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
+import { DummyFlashCard } from "./components/DummyFlashCard"
+import { DummyDecks, INITIAL_DECKS, type Deck } from "./components/DummyDecks"
+import { DeckEditor } from "./components/DeckEditor"
+import { Dashboard } from "./components/Dashboard"
 
 export default function App() {
+  // Decks & Deck Editor State
+  const [decks, setDecks] = useState<Deck[]>(INITIAL_DECKS)
+  const [editingDeckId, setEditingDeckId] = useState<string | null>(null)
+  const [isReviewing, setIsReviewing] = useState(false)
+
+  const toggleDeckEnabled = (deckId: string) => {
+    setDecks(prev =>
+      prev.map(d => (d.id === deckId ? { ...d, enabled: !d.enabled } : d))
+    )
+  }
+
+  const handleUpdateDeck = (deckId: string, updates: Partial<Deck>) => {
+    setDecks(prev =>
+      prev.map(d => (d.id === deckId ? { ...d, ...updates } : d))
+    )
+  }
+
+  const handleAddCardToDeck = (deckId: string, newCard: any) => {
+    setDecks(prev =>
+      prev.map(d =>
+        d.id === deckId
+          ? {
+            ...d,
+            count: d.count + 1,
+            cards: [...d.cards, newCard]
+          }
+          : d
+      )
+    )
+  }
+
+  const handleDeleteCardFromDeck = (deckId: string, cardId: string) => {
+    setDecks(prev =>
+      prev.map(d =>
+        d.id === deckId
+          ? {
+            ...d,
+            count: Math.max(0, d.count - 1),
+            cards: d.cards.filter(c => c.id !== cardId)
+          }
+          : d
+      )
+    )
+  }
+
+  const handleCreateNewDeck = () => {
+    const newDeckId = `deck-${Date.now()}`
+    const newDeck: Deck = {
+      id: newDeckId,
+      title: `New Deck ${decks.length + 1}`,
+      description: "Custom flashcard collection",
+      count: 0,
+      due: 0,
+      enabled: true,
+      cards: []
+    }
+    setDecks(prev => [...prev, newDeck])
+    setEditingDeckId(newDeckId)
+    setIsReviewing(false)
+  }
   const [darkMode, setDarkMode] = useState(() => {
-    // Check local storage or system preference
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme")
       if (saved) return saved === "dark"
@@ -59,12 +88,89 @@ export default function App() {
     return true
   })
 
-  const [activeCardIndex, setActiveCardIndex] = useState(0)
-  const [isFlipped, setIsFlipped] = useState(false)
-  const [userAnswer, setUserAnswer] = useState("")
-  const [isEvaluating, setIsEvaluating] = useState(false)
-  const [evalResult, setEvalResult] = useState<{ score: number; feedback: string } | null>(null)
+  // Settings State & Local Storage Persistence
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settings, setSettings] = useState<SettingsState>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("app_settings")
+      if (saved) {
+        try {
+          return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+        } catch (e) {
+          console.error("Failed to parse settings", e)
+        }
+      }
+    }
+    return DEFAULT_SETTINGS
+  })
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("app_settings", JSON.stringify(settings))
+    }
+    setDarkMode(settings.darkMode)
+  }, [settings])
+
+  const handleUpdateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
+    setSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleResetSettings = () => {
+    setSettings(prev => ({
+      ...DEFAULT_SETTINGS,
+      darkMode: prev.darkMode
+    }))
+  }
+
+  // Setup Drawer State
+  const [activeDrawerStep, setActiveDrawerStep] = useState<"apiKey" | "pwa" | "fcm" | null>(null)
+
+  // API Provider State
+  const [apiProvider, setApiProvider] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("api_provider") || "Google"
+    }
+    return "Google"
+  })
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("api_provider", apiProvider)
+    }
+  }, [apiProvider])
+
+  // API Key & IndexedDB State
+  const [encryptedPayload, setEncryptedPayload] = useState<EncryptedPayload | null>(null)
+  const [pinInput, setPinInput] = useState("")
+  const [rawApiKeyInput, setRawApiKeyInput] = useState("")
+  const [cryptoStatus, setCryptoStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null)
+  const [decryptedKeyPreview, setDecryptedKeyPreview] = useState<string | null>(null)
+
+  // PWA State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(display-mode: standalone)").matches || localStorage.getItem("pwa_installed") === "true"
+    }
+    return false
+  })
+
+  // FCM State
+  const [isFcmEnabled, setIsFcmEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fcm_enabled") === "true" || (typeof Notification !== "undefined" && Notification.permission === "granted")
+    }
+    return false
+  })
+  const [fcmToken, setFcmToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fcm_token")
+    }
+    return null
+  })
+
+
+  // Theme Sync
   useEffect(() => {
     const root = window.document.documentElement
     if (darkMode) {
@@ -76,38 +182,152 @@ export default function App() {
     }
   }, [darkMode])
 
-  const activeCard = SAMPLE_CARDS[activeCardIndex]
+  // Load Encrypted API Key from IndexedDB
+  useEffect(() => {
+    getEncryptedApiKey()
+      .then((payload) => {
+        if (payload) {
+          setEncryptedPayload(payload)
+        }
+      })
+      .catch((err) => console.error("Error loading key from IndexedDB:", err))
+  }, [])
 
-  const handleNextCard = () => {
-    setIsFlipped(false)
-    setEvalResult(null)
-    setUserAnswer("")
-    setActiveCardIndex((prev) => (prev + 1) % SAMPLE_CARDS.length)
-  }
+  // PWA Prompt Listener
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+  }, [])
 
-  const simulateAIEvaluation = () => {
-    if (!userAnswer.trim()) return
-    setIsEvaluating(true)
-    setTimeout(() => {
-      setIsEvaluating(false)
-      const lengthScore = Math.min(100, Math.round((userAnswer.length / activeCard.answer.length) * 100))
-      const score = Math.max(10, Math.min(100, lengthScore + Math.floor(Math.random() * 20 - 10)))
+  // Auto Notice Tooltip on Page Loaded
+  const [autoNoticeStep, setAutoNoticeStep] = useState<"pwa" | "apiKey" | "fcm" | null>(null)
+  const [isAutoNoticeVisible, setIsAutoNoticeVisible] = useState(false)
 
-      let feedback = ""
-      if (score >= 80) {
-        feedback = "Excellent! You captured the main concept accurately and provided solid context. Keep it up!"
-      } else if (score >= 50) {
-        feedback = "Good attempt. You got the core idea, but missed a few key details. Check the answer key below to improve."
-      } else {
-        feedback = "A bit incomplete. Focus on explaining the mechanism or core principles mentioned in the full answer."
+  useEffect(() => {
+    const targetStep = !isPwaInstalled ? "pwa" : !encryptedPayload ? "apiKey" : !isFcmEnabled ? "fcm" : null
+    if (targetStep) {
+      setAutoNoticeStep(targetStep)
+      const showTimer = setTimeout(() => {
+        setIsAutoNoticeVisible(true)
+      }, 300)
+      const hideTimer = setTimeout(() => {
+        setIsAutoNoticeVisible(false)
+      }, 4300)
+      return () => {
+        clearTimeout(showTimer)
+        clearTimeout(hideTimer)
       }
-      setEvalResult({ score, feedback })
-      setIsFlipped(true)
-    }, 1200)
+    } else {
+      setAutoNoticeStep(null)
+      setIsAutoNoticeVisible(false)
+    }
+  }, [isPwaInstalled, encryptedPayload, isFcmEnabled])
+
+
+  // API Key Encryption Handlers
+  const handleSaveApiKey = async () => {
+    if (!pinInput.trim()) {
+      setCryptoStatus({ type: "error", msg: "Please provide a PIN to encrypt the key." })
+      return
+    }
+    if (!rawApiKeyInput.trim()) {
+      setCryptoStatus({ type: "error", msg: `Please enter your ${apiProvider} API Key.` })
+      return
+    }
+    try {
+      setCryptoStatus({ type: "info", msg: "Encrypting with AES-GCM-256..." })
+      const payload = await encryptApiKey(rawApiKeyInput.trim(), pinInput.trim())
+      await saveEncryptedApiKey(payload)
+      setEncryptedPayload(payload)
+      setRawApiKeyInput("")
+      setPinInput("")
+      setCryptoStatus({ type: "success", msg: "API Key encrypted & stored in IndexedDB!" })
+    } catch (err: any) {
+      setCryptoStatus({ type: "error", msg: `Encryption failed: ${err.message || err}` })
+    }
   }
+
+  const handleDecryptApiKey = async () => {
+    if (!encryptedPayload) return
+    if (!pinInput.trim()) {
+      setCryptoStatus({ type: "error", msg: "Please enter your PIN to decrypt." })
+      return
+    }
+    try {
+      const decrypted = await decryptApiKey(encryptedPayload, pinInput.trim())
+      setDecryptedKeyPreview(decrypted)
+      setCryptoStatus({ type: "success", msg: "Decryption successful! Key valid." })
+    } catch (err) {
+      setDecryptedKeyPreview(null)
+      setCryptoStatus({ type: "error", msg: "Incorrect PIN or decryption error." })
+    }
+  }
+
+  const handleRemoveApiKey = async () => {
+    try {
+      await removeEncryptedApiKey()
+      setEncryptedPayload(null)
+      setDecryptedKeyPreview(null)
+      setCryptoStatus({ type: "info", msg: "Key removed from IndexedDB." })
+    } catch (err: any) {
+      setCryptoStatus({ type: "error", msg: `Failed to remove key: ${err.message}` })
+    }
+  }
+
+  // PWA Install Handler
+  const handleInstallPwa = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === "accepted") {
+        setIsPwaInstalled(true)
+        localStorage.setItem("pwa_installed", "true")
+      }
+      setDeferredPrompt(null)
+    } else {
+      // Toggle for simulation/manual verification
+      const nextState = !isPwaInstalled
+      setIsPwaInstalled(nextState)
+      localStorage.setItem("pwa_installed", String(nextState))
+    }
+  }
+
+  // FCM Enable Handler
+  const handleEnableFcm = async () => {
+    if (typeof Notification !== "undefined") {
+      const permission = await Notification.requestPermission()
+      if (permission === "granted") {
+        const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
+        setFcmToken(mockToken)
+        localStorage.setItem("fcm_token", mockToken)
+        setIsFcmEnabled(true)
+        localStorage.setItem("fcm_enabled", "true")
+        return
+      }
+    }
+    // Simulation fallback
+    const mockToken = "fcm_token_" + Math.random().toString(36).substring(2, 12)
+    setFcmToken(mockToken)
+    localStorage.setItem("fcm_token", mockToken)
+    setIsFcmEnabled(true)
+    localStorage.setItem("fcm_enabled", "true")
+  }
+
+  const handleDisableFcm = () => {
+    setIsFcmEnabled(false)
+    setFcmToken(null)
+    localStorage.removeItem("fcm_token")
+    localStorage.setItem("fcm_enabled", "false")
+  }
+
+  const totalReviewsDue = decks.filter(d => d.enabled).reduce((acc, deck) => acc + deck.due, 0)
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans selection:bg-primary/30 relative">
       {/* Decorative gradient overlay */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-gradient-to-b from-primary/10 via-transparent to-transparent blur-3xl pointer-events-none -z-10" />
 
@@ -118,22 +338,161 @@ export default function App() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/20">
               <Sparkles className="h-5 w-5" />
             </div>
-            <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
-              AI Flash Cards
-            </span>
+            <div className="relative inline-flex items-center pr-6">
+              <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
+                AI Flash Cards
+              </span>
+            </div>
           </div>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-2 relative">
+            {/* Header Setup Icon Buttons */}
+            <div className="flex items-center gap-2 pr-2 border-r border-border">
+              {/* 1. Install PWA Button */}
+              <div className="relative group">
+                <button
+                  onClick={() => setActiveDrawerStep("pwa")}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${isPwaInstalled
+                    ? "border-emerald-500/30 text-emerald-500 hover:border-emerald-500/60 bg-emerald-500/10"
+                    : "border-rose-500/30 text-rose-500 hover:border-rose-500/60 bg-rose-500/10 animate-pulse-slow"
+                    }`}
+                  aria-label="Install PWA"
+                  title="Install PWA"
+                >
+                  <Smartphone className="h-5 w-5" />
+                </button>
+
+                {/* Hover Tooltip */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden w-64 group-hover:block rounded-xl border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg z-50 pointer-events-none animate-in fade-in duration-150">
+                  <div className="font-semibold text-primary mb-1 flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" /> What breaks without it?
+                  </div>
+                  <p className="text-muted-foreground leading-snug">
+                    Progressive Web Apps shield your local data from accidental and automatic cleanups in the long term. Also prerequisite for receiving reminder notifications when the app is closed.
+                  </p>
+                </div>
+
+                {/* Auto Slide-In Tooltip on Page Load */}
+                {autoNoticeStep === "pwa" && (
+                  <div
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-50 pointer-events-none transition-all duration-500 ease-out whitespace-nowrap ${isAutoNoticeVisible
+                      ? "opacity-100 translate-y-0 scale-100"
+                      : "opacity-0 -translate-y-2 scale-95"
+                      }`}
+                  >
+                    <div className="relative flex items-center gap-2 rounded-xl border border-rose-500/30 bg-popover px-3.5 py-2 text-m font-bold text-rose-500 shadow-xl animate-pulse-slow">
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-t border-l border-rose-500/30 rotate-45" />
+                      <Sparkles className="h-4 w-4 text-rose-500 shrink-0" />
+                      <span>Finish page setup here</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* 2. API Key Button */}
+              <div className="relative group">
+                <button
+                  onClick={() => {
+                    setActiveDrawerStep("apiKey")
+                    setCryptoStatus(null)
+                    setDecryptedKeyPreview(null)
+                  }}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${encryptedPayload
+                    ? "border-emerald-500/30 text-emerald-500 hover:border-emerald-500/60 bg-emerald-500/10"
+                    : "border-rose-500/30 text-rose-500 hover:border-rose-500/60 bg-rose-500/10 animate-pulse-slow"
+                    }`}
+                  aria-label="LLM API Key Setup"
+                  title="LLM API Key"
+                >
+                  <Key className="h-5 w-5" />
+                </button>
+
+                {/* Hover Tooltip */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden w-64 group-hover:block rounded-xl border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg z-50 pointer-events-none animate-in fade-in duration-150">
+                  <div className="font-semibold text-primary mb-1 flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" /> What breaks without it?
+                  </div>
+                  <p className="text-muted-foreground leading-snug">
+                    Without an API Key, answer evaluation doesn't work.
+                  </p>
+                </div>
+
+                {/* Auto Slide-In Tooltip on Page Load */}
+                {autoNoticeStep === "apiKey" && (
+                  <div
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-50 pointer-events-none transition-all duration-500 ease-out whitespace-nowrap ${isAutoNoticeVisible
+                      ? "opacity-100 translate-y-0 scale-100"
+                      : "opacity-0 -translate-y-2 scale-95"
+                      }`}
+                  >
+                    <div className="relative flex items-center gap-2 rounded-xl border border-rose-500/30 bg-popover px-3.5 py-2 text-m font-bold text-rose-500 shadow-xl animate-pulse-slow">
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-t border-l border-rose-500/30 rotate-45" />
+                      <Sparkles className="h-4 w-4 text-rose-500 shrink-0" />
+                      <span>Finish page setup here</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Setup FCM Button */}
+              <div className="relative group">
+                <button
+                  onClick={() => setActiveDrawerStep("fcm")}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${isFcmEnabled
+                    ? "border-emerald-500/30 text-emerald-500 hover:border-emerald-500/60 bg-emerald-500/10"
+                    : "border-rose-500/30 text-rose-500 hover:border-rose-500/60 bg-rose-500/10 animate-pulse-slow"
+                    }`}
+                  aria-label="Setup FCM"
+                  title="Setup FCM"
+                >
+                  <Bell className="h-5 w-5" />
+                </button>
+
+                {/* Hover Tooltip */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden w-64 group-hover:block rounded-xl border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg z-50 pointer-events-none animate-in fade-in duration-150">
+                  <div className="font-semibold text-primary mb-1 flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" /> What breaks without it?
+                  </div>
+                  <p className="text-muted-foreground leading-snug">
+                    Firebase Cloud Messaging (FCM) enables study reminders for due reviews. PWA installation is required for this to work while the app is closed.
+                  </p>
+                </div>
+
+                {/* Auto Slide-In Tooltip on Page Load */}
+                {autoNoticeStep === "fcm" && (
+                  <div
+                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-2.5 z-50 pointer-events-none transition-all duration-500 ease-out whitespace-nowrap ${isAutoNoticeVisible
+                      ? "opacity-100 translate-y-0 scale-100"
+                      : "opacity-0 -translate-y-2 scale-95"
+                      }`}
+                  >
+                    <div className="relative flex items-center gap-2 rounded-xl border border-rose-500/30 bg-popover px-3.5 py-2 text-m font-bold text-rose-500 shadow-xl animate-pulse-slow">
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-popover border-t border-l border-rose-500/30 rotate-45" />
+                      <Sparkles className="h-4 w-4 text-rose-500 shrink-0" />
+                      <span>Finish page setup here</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Dark Mode Toggle */}
             <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm"
+              onClick={() => handleUpdateSetting("darkMode", !settings.darkMode)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer"
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
             </button>
-            <button className="flex items-center gap-1.5 rounded-xl bg-primary px-4 h-10 font-medium text-primary-foreground hover:opacity-90 transition-all duration-200 active:scale-95 shadow-sm shadow-primary/20">
-              <Plus className="h-4 w-4" />
-              <span className="text-sm hidden sm:inline">New Deck</span>
+
+            {/* Header Settings Button */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${isSettingsOpen ? "ring-2 ring-primary/40 border-primary" : ""
+                }`}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" />
             </button>
           </nav>
         </div>
@@ -141,285 +500,84 @@ export default function App() {
 
       {/* Main Content */}
       <main className="container max-w-6xl mx-auto py-8 px-4 sm:px-6">
-        {/* Welcome Section */}
-        <section className="mb-10 text-center sm:text-left">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary mb-3">
-            <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-            Styling and UI Foundation Ready
-          </div>
-          <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl mb-3">
-            Supercharge Your Study Sessions
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl">
-            A beautiful, offline-first application combining spaced repetition learning with AI-powered answers and intelligent feedback.
-          </p>
-        </section>
-
-        {/* Info Cards / Stats */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
-          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/20 group">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500 dark:bg-violet-400/10 dark:text-violet-400 group-hover:scale-110 transition-transform duration-200">
-              <Layers className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Local Decks</p>
-              <h3 className="text-2xl font-bold font-display">4 Active</h3>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/20 group">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-200">
-              <GraduationCap className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Reviews Due</p>
-              <h3 className="text-2xl font-bold font-display">12 Cards</h3>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/20 group">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 dark:bg-emerald-400/10 dark:text-emerald-400 group-hover:scale-110 transition-transform duration-200">
-              <TrendingUp className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Retention Rate</p>
-              <h3 className="text-2xl font-bold font-display">94.2%</h3>
-            </div>
-          </div>
-        </section>
 
         {/* Study Sandbox and Interactive Demo */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Card Showcase - Left & Center Column */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Flashcard Container */}
-            <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm transition-all duration-300 relative overflow-hidden">
-              <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none" />
-
-              {/* Card Meta Header */}
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Card {activeCardIndex + 1} of {SAMPLE_CARDS.length}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                    {activeCard.category}
-                  </span>
-                  <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${activeCard.difficulty === "Easy" ? "bg-emerald-500/10 text-emerald-500" :
-                    activeCard.difficulty === "Medium" ? "bg-amber-500/10 text-amber-500" :
-                      "bg-rose-500/10 text-rose-500"
-                    }`}>
-                    {activeCard.difficulty}
-                  </span>
-                </div>
-              </div>
-
-              {/* Card Body - Dual States */}
-              <div className="min-h-[160px] flex flex-col justify-center mb-6">
-                {!isFlipped ? (
-                  <div>
-                    <h2 className="font-display text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-3xl">
-                      {activeCard.question}
-                    </h2>
-                  </div>
-                ) : (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Question</p>
-                      <h4 className="font-medium text-foreground text-base sm:text-lg">{activeCard.question}</h4>
-                    </div>
-                    <div className="border-t border-border pt-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Official Answer</p>
-                      <p className="text-foreground leading-relaxed text-sm sm:text-base">
-                        {activeCard.answer}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Input section & controls */}
-              {!isFlipped && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="answer-input" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                      Your Written Answer
-                      <span className="text-xs text-muted-foreground font-normal">(AI will score accuracy)</span>
-                    </label>
-                    <textarea
-                      id="answer-input"
-                      value={userAnswer}
-                      onChange={(e) => setUserAnswer(e.target.value)}
-                      placeholder="Type your explanation or memory of the answer here..."
-                      className="w-full min-h-[100px] rounded-xl border border-border bg-background p-4 text-sm outline-none transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-y"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={simulateAIEvaluation}
-                      disabled={isEvaluating || !userAnswer.trim()}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      {isEvaluating ? (
-                        <>
-                          <RefreshCw className="h-5 w-5 animate-spin" />
-                          AI Evaluating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-5 w-5" />
-                          Evaluate with AI
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setIsFlipped(true)}
-                      className="rounded-xl border border-border px-5 h-12 font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-98 shadow-sm"
-                    >
-                      Reveal Answer
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Feedback and Results */}
-              {isFlipped && (
-                <div className="space-y-5">
-                  {evalResult && (
-                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                          <span className="font-semibold text-foreground">AI Scoring Report</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-2xl font-extrabold text-primary font-display">{evalResult.score}</span>
-                          <span className="text-xs text-muted-foreground">/100</span>
-                        </div>
-                      </div>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {evalResult.feedback}
-                      </p>
-
-                      {/* Metric bar visualizer */}
-                      <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-violet-500 transition-all duration-500 rounded-full"
-                          style={{ width: `${evalResult.score}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-center gap-3 pt-3 border-t border-border">
-                    <button
-                      onClick={() => setIsFlipped(false)}
-                      className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
-                    >
-                      Back to Prompt
-                    </button>
-                    <button
-                      onClick={handleNextCard}
-                      className="flex items-center gap-2 rounded-xl bg-foreground px-5 h-11 text-sm font-semibold text-background hover:bg-foreground/90 transition-all duration-200 active:scale-95 shadow-sm"
-                    >
-                      Next Flashcard
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Application Features Highlights */}
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-              <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                Technical Roadmap Highlights
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-secondary/50 border border-border">
-                  <Database className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-sm mb-0.5">IndexedDB Sync</h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">Local store for full offline capabilities and persistent card histories.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-secondary/50 border border-border">
-                  <CloudLightning className="h-5 w-5 text-primary mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-sm mb-0.5">PWA Installation</h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">Vite PWA caching config with service workers for sub-second offline launches.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Your Decks Sidebar - Left Column */}
+          <div className="flex flex-col gap-6 lg:col-span-1">
+            <DummyDecks
+              decks={decks}
+              editingDeckId={editingDeckId}
+              onSelectDeck={(id) => {
+                setEditingDeckId(id)
+                setIsReviewing(false)
+              }}
+              onToggleDeckEnabled={toggleDeckEnabled}
+              onCreateNewDeck={handleCreateNewDeck}
+            />
           </div>
 
-          {/* Sidebar - Decks and Instructions */}
-          <div className="flex flex-col gap-6">
-            {/* Quick settings panel */}
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-              <h3 className="font-display font-bold text-lg mb-4">Study Settings</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-semibold text-foreground block">Spaced Repetition</label>
-                    <span className="text-xs text-muted-foreground">Adjust intervals based on score</span>
-                  </div>
-                  <div className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-primary transition-colors">
-                    <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-primary-foreground transition-transform" />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-semibold text-foreground block">Voice Synthesis</label>
-                    <span className="text-xs text-muted-foreground">Read card question aloud</span>
-                  </div>
-                  <div className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-secondary transition-colors">
-                    <span className="translate-x-1 inline-block h-4 w-4 transform rounded-full bg-card transition-transform" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* List of Decks Mockup */}
-            <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-bold text-lg">Your Decks</h3>
-                <span className="text-xs font-semibold text-primary cursor-pointer hover:underline">View All</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { title: "System Architecture", count: 24, due: 3, color: "from-blue-500 to-indigo-500" },
-                  { title: "Progressive Web Apps", count: 15, due: 5, color: "from-purple-500 to-pink-500" },
-                  { title: "Artificial Intelligence", count: 18, due: 4, color: "from-amber-500 to-orange-500" },
-                ].map((deck, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-3.5 rounded-xl border border-border hover:border-primary/20 bg-card hover:bg-secondary/20 transition-all duration-200 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`h-8.5 w-8.5 rounded-lg bg-gradient-to-tr ${deck.color} opacity-85 group-hover:scale-105 transition-transform duration-200`} />
-                      <div>
-                        <h4 className="font-semibold text-sm text-foreground">{deck.title}</h4>
-                        <span className="text-xs text-muted-foreground">{deck.count} cards</span>
-                      </div>
-                    </div>
-                    {deck.due > 0 ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                        {deck.due} due
-                      </span>
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Main Showcase / Deck Editor Area - Right Column */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            {editingDeckId && decks.find(d => d.id === editingDeckId) ? (
+              <DeckEditor
+                currentDeck={decks.find(d => d.id === editingDeckId)!}
+                onClose={() => setEditingDeckId(null)}
+                onUpdateDeck={handleUpdateDeck}
+                onAddCard={handleAddCardToDeck}
+                onDeleteCard={handleDeleteCardFromDeck}
+              />
+            ) : isReviewing ? (
+              <DummyFlashCard onClose={() => setIsReviewing(false)} />
+            ) : (
+              <Dashboard
+                totalDue={totalReviewsDue}
+                onStartReview={() => setIsReviewing(true)}
+              />
+            )}
           </div>
         </div>
       </main>
+
+      {/* Settings Bottom-Sliding Modal Drawer */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onUpdateSetting={handleUpdateSetting}
+        onResetDefaults={handleResetSettings}
+        onOpenDrawerStep={(step) => setActiveDrawerStep(step)}
+      />
+
+      {/* Closable Setup Drawer Modal */}
+      <SetupDrawer
+        activeDrawerStep={activeDrawerStep}
+        onClose={() => setActiveDrawerStep(null)}
+        apiKeyProps={{
+          apiProvider,
+          setApiProvider,
+          pinInput,
+          setPinInput,
+          rawApiKeyInput,
+          setRawApiKeyInput,
+          cryptoStatus,
+          encryptedPayload,
+          decryptedKeyPreview,
+          handleSaveApiKey,
+          handleDecryptApiKey,
+          handleRemoveApiKey
+        }}
+        pwaProps={{
+          isPwaInstalled,
+          handleInstallPwa
+        }}
+        fcmProps={{
+          isFcmEnabled,
+          fcmToken,
+          handleEnableFcm,
+          handleDisableFcm
+        }}
+      />
 
       {/* Footer */}
       <footer className="border-t border-border bg-card mt-16 py-8">
