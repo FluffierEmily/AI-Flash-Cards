@@ -23,11 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Vite PWA development distribution
+dev-dist/
+
 # Firebase
 .firebase/
 *-debug.log
 
 .agents/*
-
-# Vite PWA development distribution
-dev-dist/
