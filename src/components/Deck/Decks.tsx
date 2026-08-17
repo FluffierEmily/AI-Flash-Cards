@@ -165,7 +165,7 @@ export function DummyDecks({
 
         <button
           onClick={onCreateNewDeck}
-          className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-border hover:border-primary/50 bg-background/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 active:scale-98 font-medium text-sm shadow-sm group cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-muted-foreground/40 hover:border-primary/50 bg-background/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 active:scale-98 font-medium text-sm shadow-sm group cursor-pointer"
           aria-label="Create New Deck"
           title="Create New Deck"
         >
