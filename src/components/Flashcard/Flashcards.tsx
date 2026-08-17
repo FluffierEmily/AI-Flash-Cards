@@ -1,33 +1,39 @@
 import { useState, useRef, useEffect } from "react"
-import { RefreshCw, Sparkles, CheckCircle2, RotateCcw, Meh, Smile, Zap, ArrowLeft } from "lucide-react"
-import { RichTextEditor } from "./RichTextEditor/RichTextEditor"
-
-export interface Flashcard {
-  id: string
-  question: string
-  answer: string
-  category: string
-  difficulty?: string
-}
+import { RefreshCw, Sparkles, CheckCircle2, RotateCcw, Meh, Smile, Zap, ArrowLeft, HelpCircle } from "lucide-react"
+import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
+import type { Flashcard } from "./Flashcard"
 
 export const SAMPLE_CARDS: Flashcard[] = [
   {
     id: "1",
-    category: "System Architecture",
+    deckId: "deck-1",
+    label: "System Architecture",
     question: "What is Spaced Repetition?",
-    answer: "A learning technique where flashcards are scheduled for review at increasing intervals based on how well you remember them. It exploits the psychological spacing effect to maximize retention."
+    answer: "A learning technique where flashcards are scheduled for review at increasing intervals based on how well you remember them. It exploits the psychological spacing effect to maximize retention.",
+    hints: [
+      "<p>It is based on the <strong>forgetting curve</strong>.</p>",
+      "<p>Think about spacing out reviews over time rather than cramming.</p>"
+    ]
   },
   {
     id: "2",
-    category: "Progressive Web Apps",
+    deckId: "deck-2",
+    label: "Progressive Web Apps",
     question: "Explain Offline-First Architecture",
-    answer: "A design pattern where all data read/write operations are performed against a local database (like IndexedDB) first. Background synchronization handles syncing with server endpoints when online, ensuring the app works without internet."
+    answer: "A design pattern where all data read/write operations are performed against a local database (like IndexedDB) first. Background synchronization handles syncing with server endpoints when online, ensuring the app works without internet.",
+    hints: [
+      "<p>Data is stored locally first before syncing.</p>"
+    ]
   },
   {
     id: "3",
-    category: "AI & LLMs",
+    deckId: "deck-3",
+    label: "AI & LLMs",
     question: "How can LLMs be used to enhance flashcards?",
-    answer: "Traditional cards rely on binary self-grading. AI evaluation analyzes free-form or spoken answers for accuracy, semantic correctness, and completeness, providing detailed corrective feedback."
+    answer: "Traditional cards rely on binary self-grading. AI evaluation analyzes free-form or spoken answers for accuracy, semantic correctness, and completeness, providing detailed corrective feedback.",
+    hints: [
+      "<p>AI acts as an intelligent grader.</p>"
+    ]
   }
 ]
 
@@ -41,6 +47,12 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
   const [userAnswer, setUserAnswer] = useState("")
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evalResult, setEvalResult] = useState<{ score: number; feedback: string } | null>(null)
+  const [revealedHints, setRevealedHints] = useState<Record<number, boolean>>({})
+
+  // Reset revealed hints when card changes
+  useEffect(() => {
+    setRevealedHints({})
+  }, [activeCardIndex])
 
   const [cardHeight, setCardHeight] = useState<number | undefined>(undefined)
   const frontRef = useRef<HTMLDivElement>(null)
@@ -128,7 +140,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
             </h3>
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                {activeCard.category}
+                {activeCard.label}
               </span>
             </div>
           </div>
@@ -141,6 +153,53 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
               </h2>
             </div>
           </div>
+
+          {/* Hints Section */}
+          {activeCard.hints && activeCard.hints.length > 0 && (
+            <div className="mb-6 space-y-3">
+              <div className="flex flex-wrap items-center gap-2 justify-center">
+                {activeCard.hints.map((_, idx) => {
+                  const isRevealed = !!revealedHints[idx]
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setRevealedHints(prev => ({ ...prev, [idx]: !isRevealed }))}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isRevealed
+                          ? "bg-secondary text-secondary-foreground border-secondary"
+                          : "bg-background border-border text-muted-foreground hover:text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                      {isRevealed ? `Hide Hint ${idx + 1}` : `Show Hint ${idx + 1}`}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Render revealed hints */}
+              <div className="space-y-2 max-w-xl mx-auto">
+                {activeCard.hints.map((hint, idx) => {
+                  if (!revealedHints[idx]) return null
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-2xl border border-amber-500/10 bg-amber-500/5 text-xs text-foreground leading-relaxed animate-in fade-in-50 slide-in-from-top-1 duration-200"
+                    >
+                      <div className="font-bold text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">
+                        Hint #{idx + 1}
+                      </div>
+                      <div 
+                        className="prose dark:prose-invert max-w-none text-muted-foreground leading-normal"
+                        dangerouslySetInnerHTML={{ __html: hint }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Input section & controls */}
           <div className="space-y-4">
@@ -208,7 +267,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
             </h3>
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                {activeCard.category}
+                {activeCard.label}
               </span>
             </div>
           </div>

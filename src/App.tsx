@@ -14,16 +14,41 @@ import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
 import { useFcm } from "./components/drawers/FcmDrawer"
 import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
-import { DummyFlashCard } from "./components/DummyFlashCard"
-import { DummyDecks, INITIAL_DECKS, type Deck } from "./components/DummyDecks"
-import { DeckEditor } from "./components/DeckEditor"
+import { DummyFlashCard } from "./components/Flashcard/Flashcards"
+import { DummyDecks, INITIAL_DECKS } from "./components/Deck/Decks"
+import { type Deck } from "./components/Deck/Deck"
+import { DeckViewer } from "./components/Deck/DeckViewer"
 import { Dashboard } from "./components/Dashboard"
+
+import { loadDecks, saveDecks } from "./lib/deckStorage"
 
 export default function App() {
   // Decks & Deck Editor State
-  const [decks, setDecks] = useState<Deck[]>(INITIAL_DECKS)
+  const [decks, setDecks] = useState<Deck[]>([])
+  const [hasLoadedDecks, setHasLoadedDecks] = useState(false)
   const [editingDeckId, setEditingDeckId] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
+
+  // Load decks asynchronously on mount
+  useEffect(() => {
+    loadDecks()
+      .then((savedDecks) => {
+        setDecks(savedDecks)
+        setHasLoadedDecks(true)
+      })
+      .catch((err) => {
+        console.error("Failed to load decks", err)
+        setDecks(INITIAL_DECKS)
+        setHasLoadedDecks(true)
+      })
+  }, [])
+
+  // Save decks asynchronously on change (only after loaded)
+  useEffect(() => {
+    if (hasLoadedDecks) {
+      saveDecks(decks)
+    }
+  }, [decks, hasLoadedDecks])
 
   const toggleDeckEnabled = (deckId: string) => {
     setDecks(prev =>
@@ -519,7 +544,7 @@ export default function App() {
           {/* Main Showcase / Deck Editor Area - Right Column */}
           <div className="lg:col-span-2 flex flex-col gap-6">
             {editingDeckId && decks.find(d => d.id === editingDeckId) ? (
-              <DeckEditor
+              <DeckViewer
                 currentDeck={decks.find(d => d.id === editingDeckId)!}
                 onClose={() => setEditingDeckId(null)}
                 onUpdateDeck={handleUpdateDeck}

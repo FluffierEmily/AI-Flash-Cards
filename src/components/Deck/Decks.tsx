@@ -1,15 +1,5 @@
-import { Plus } from "lucide-react"
-import type { Flashcard } from "./DummyFlashCard"
-
-export interface Deck {
-  id: string
-  title: string
-  description?: string
-  count: number
-  due: number
-  enabled: boolean
-  cards: Flashcard[]
-}
+import { Plus, Layers } from "lucide-react"
+import type { Deck } from "./Deck"
 
 export const INITIAL_DECKS: Deck[] = [
   {
@@ -22,15 +12,17 @@ export const INITIAL_DECKS: Deck[] = [
     cards: [
       {
         id: "1",
-        category: "Architecture",
-        difficulty: "Medium",
+        deckId: "deck-1",
+        label: "Architecture",
+        difficulty: "medium",
         question: "What is Spaced Repetition?",
         answer: "A learning technique where flashcards are scheduled for review at increasing intervals based on how well you remember them. It exploits the psychological spacing effect to maximize retention."
       },
       {
         id: "1-2",
-        category: "Architecture",
-        difficulty: "Hard",
+        deckId: "deck-1",
+        label: "Architecture",
+        difficulty: "hard",
         question: "What is the CAP Theorem?",
         answer: "In a distributed data store, you can only provide two of three guarantees: Consistency, Availability, and Partition Tolerance."
       }
@@ -46,8 +38,9 @@ export const INITIAL_DECKS: Deck[] = [
     cards: [
       {
         id: "2",
-        category: "PWA",
-        difficulty: "Easy",
+        deckId: "deck-2",
+        label: "PWA",
+        difficulty: "easy",
         question: "Explain Offline-First Architecture",
         answer: "A design pattern where all data read/write operations are performed against a local database (like IndexedDB) first. Background synchronization handles syncing with server endpoints when online."
       }
@@ -63,8 +56,9 @@ export const INITIAL_DECKS: Deck[] = [
     cards: [
       {
         id: "3",
-        category: "AI & LLMs",
-        difficulty: "Hard",
+        deckId: "deck-3",
+        label: "AI & LLMs",
+        difficulty: "hard",
         question: "How does AI scoring improve traditional flashcards?",
         answer: "Traditional cards rely on binary self-grading. AI evaluation analyzes free-form or spoken answers for accuracy, semantic correctness, and completeness."
       }
@@ -111,6 +105,7 @@ export function DummyDecks({
     <div className="rounded-3xl border border-border bg-card p-6 shadow-sm flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
+          <Layers className="h-5 w-5 text-primary shrink-0" />
           Your Decks
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
             {activeCount} Active
@@ -124,49 +119,43 @@ export function DummyDecks({
             <div
               key={deck.id}
               onClick={() => onSelectDeck(deck.id)}
-              className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group ${
-                isEditing
-                  ? "border-primary bg-primary/10 ring-1 ring-primary/40 shadow-sm"
-                  : !deck.enabled
-                    ? "border-border/50 bg-secondary/10 opacity-60 hover:opacity-80"
-                    : "border-border hover:border-primary/30 bg-card hover:bg-secondary/20"
-              }`}
+              className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group ${isEditing
+                ? "border-primary bg-primary/10 ring-1 ring-primary/40 shadow-sm"
+                : !deck.enabled
+                  ? "border-border/50 bg-secondary/10 opacity-60 hover:opacity-80"
+                  : "border-border hover:border-primary/30 bg-card hover:bg-secondary/20"
+                }`}
             >
               <div className="flex-1 min-w-0 pr-2">
                 <div className="flex items-center gap-2">
                   <h4 className={`font-semibold text-sm truncate ${!deck.enabled ? "text-muted-foreground line-through decoration-muted-foreground/40" : "text-foreground"}`}>
                     {deck.title}
                   </h4>
-                  {isEditing && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary px-1.5 py-0.5 rounded bg-primary/15 shrink-0">
-                      Editing
+                  {/* Editing badge removed */}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-muted-foreground leading-none">{deck.count} cards</span>
+                  {deck.due > 0 && deck.enabled && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary leading-none">
+                      {deck.due} due
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">{deck.count} cards</span>
               </div>
 
               <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                {deck.due > 0 && deck.enabled && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                    {deck.due} due
-                  </span>
-                )}
-
                 {/* Toggle slide button */}
                 <button
                   type="button"
                   onClick={() => onToggleDeckEnabled(deck.id)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                    deck.enabled ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none ${deck.enabled ? "bg-primary" : "bg-muted-foreground/30"
+                    }`}
                   aria-label={`Toggle ${deck.title}`}
                   title={deck.enabled ? "Deck active for study" : "Deck disabled"}
                 >
                   <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 shadow-xs ${
-                      deck.enabled ? "translate-x-4.5" : "translate-x-1"
-                    }`}
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 shadow-xs ${deck.enabled ? "translate-x-4.5" : "translate-x-1"
+                      }`}
                   />
                 </button>
               </div>

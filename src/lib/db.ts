@@ -5,7 +5,7 @@ const DB_VERSION = 1
 const STORE_NAME = "settings"
 const API_KEY_RECORD_ID = "encrypted_gemini_api_key"
 
-function openDB(): Promise<IDBDatabase> {
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
@@ -13,6 +13,9 @@ function openDB(): Promise<IDBDatabase> {
       const db = (event.target as IDBOpenDBRequest).result
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME)
+      }
+      if (!db.objectStoreNames.contains("decks")) {
+        db.createObjectStore("decks")
       }
     }
 
