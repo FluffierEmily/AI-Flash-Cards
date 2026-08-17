@@ -155,13 +155,6 @@ export function DeckViewer({
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Flashcards ({filteredCards.length}{searchQuery ? ` / ${currentDeck.cards.length}` : ""})
           </h3>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-all cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Flashcard
-          </button>
         </div>
 
         {/* Search Input Field */}
@@ -186,38 +179,56 @@ export function DeckViewer({
         </div>
 
         {/* Card Items List */}
-        {filteredCards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-background/50 p-8 text-center space-y-2">
+        {currentDeck.cards.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 border border-dashed border-border rounded-2xl bg-background/50 space-y-3">
             <p className="text-sm font-medium text-muted-foreground">
-              {searchQuery ? "No flashcards match your search." : "No flashcards in this deck yet."}
+              No flashcards in this deck yet.
             </p>
-            <p className="text-xs text-muted-foreground/70">
-              {searchQuery ? "Try searching for a different keyword or clear the search query." : 'Click "+ Add Flashcard" above to create your first question.'}
-            </p>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="relative group border border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-primary/5 cursor-pointer active:scale-95 text-muted-foreground hover:text-primary"
+              title="Add Flashcard"
+            >
+              <Plus className="h-6 w-6 stroke-[2]" />
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,120px)] gap-3 justify-center sm:justify-start max-h-[300px] sm:max-h-[420px] overflow-y-auto pr-1 mt-3 py-4 px-1">
-            {filteredCards.map((card) => (
-              <div
-                key={card.id}
-                onClick={() => setSelectedCardForEdit(card)}
-                className="relative group border border-white/10 bg-gradient-to-br from-purple-800/50 to-neutral-800 rounded-xl p-3 flex flex-col items-center justify-center text-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:border-primary/40 hover:shadow-lg hover:shadow-primary/20 shadow-md shadow-black/35 cursor-pointer active:scale-95"
+          <div className="space-y-3">
+            {searchQuery && filteredCards.length === 0 && (
+              <p className="text-xs text-center text-muted-foreground py-2">
+                No flashcards match your search.
+              </p>
+            )}
+            <div className="grid grid-cols-[repeat(auto-fill,120px)] gap-3 justify-center sm:justify-start max-h-[300px] sm:max-h-[420px] overflow-y-auto pr-1 mt-3 py-4 px-1">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="relative group border border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-primary/5 cursor-pointer active:scale-95 text-muted-foreground hover:text-primary"
+                title="Add Flashcard"
               >
-                <span className="font-semibold text-xs text-white line-clamp-3 break-words w-full px-1 block">
-                  {card.question}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDeleteCard(currentDeck.id, card.id)
-                  }}
-                  className="absolute top-1.5 right-1.5 text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer shrink-0"
-                  title="Delete Flashcard"
+                <Plus className="h-6 w-6 stroke-[2]" />
+              </button>
+              {filteredCards.map((card) => (
+                <div
+                  key={card.id}
+                  onClick={() => setSelectedCardForEdit(card)}
+                  className="relative group border border-white/10 bg-gradient-to-br from-purple-800/50 to-neutral-800 rounded-xl p-3 flex flex-col items-center justify-center text-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:border-primary/40 hover:shadow-lg hover:shadow-primary/20 shadow-md shadow-black/35 cursor-pointer active:scale-95"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
+                  <span className="font-semibold text-xs text-white line-clamp-3 break-words w-full px-1 block">
+                    {card.question}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeleteCard(currentDeck.id, card.id)
+                    }}
+                    className="absolute top-1.5 right-1.5 text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer shrink-0"
+                    title="Delete Flashcard"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
