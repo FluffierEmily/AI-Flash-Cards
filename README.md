@@ -219,7 +219,7 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [x] Setup shadcn/ui, styling, and theme configuration.
 - [x] Homepage layout (landing page) with dummy buttons.
 - [x] Configure PWA support (`vite-plugin-pwa`, web manifest, icons).
-- [ ] Implement deck management and flashcard creation workflows.
+- [x] Implement deck management and flashcard creation workflows.
 - [ ] Build the interactive review session UI (card viewer, keyboard controls).
 - [ ] Integrate local spaced repetition scheduling logic.
 - [ ] Add the AI evaluation layer (LLM scoring endpoint).
