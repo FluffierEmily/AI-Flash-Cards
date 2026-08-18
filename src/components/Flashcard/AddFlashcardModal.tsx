@@ -101,7 +101,6 @@ export function AddFlashcardModal({
           if (d.id === deckId) {
             return {
               ...d,
-              count: d.count + 1,
               cards: [...d.cards, newCard]
             }
           }

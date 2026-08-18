@@ -6,7 +6,6 @@ export const INITIAL_DECKS: Deck[] = [
     id: "deck-1",
     title: "System Architecture",
     description: "Core concepts of scalable software design, APIs, microservices, and system resilience.",
-    count: 24,
     due: 3,
     enabled: true,
     cards: [
@@ -32,7 +31,6 @@ export const INITIAL_DECKS: Deck[] = [
     id: "deck-2",
     title: "Progressive Web Apps",
     description: "Service workers, web app manifests, caching strategies, and offline-first design.",
-    count: 15,
     due: 5,
     enabled: true,
     cards: [
@@ -50,7 +48,6 @@ export const INITIAL_DECKS: Deck[] = [
     id: "deck-3",
     title: "Artificial Intelligence",
     description: "LLMs, prompt engineering, vector embeddings, and automated scoring models.",
-    count: 18,
     due: 4,
     enabled: false, // Disabled deck example
     cards: [
@@ -68,7 +65,6 @@ export const INITIAL_DECKS: Deck[] = [
     id: "deck-4",
     title: "React & TypeScript",
     description: "Component patterns, strict typing, hooks, state management, and performance optimization.",
-    count: 32,
     due: 2,
     enabled: true,
     cards: []
@@ -77,7 +73,6 @@ export const INITIAL_DECKS: Deck[] = [
     id: "deck-5",
     title: "Cloud Infrastructure",
     description: "Serverless, container orchestration, CI/CD pipelines, and cloud security.",
-    count: 20,
     due: 0,
     enabled: true,
     cards: []
@@ -134,7 +129,7 @@ export function DummyDecks({
                   {/* Editing badge removed */}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-xs text-muted-foreground leading-none">{deck.count} cards</span>
+                  <span className="text-xs text-muted-foreground leading-none">{deck.cards.length} cards</span>
                   {deck.due > 0 && deck.enabled && (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary leading-none">
                       {deck.due} due

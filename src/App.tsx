@@ -68,7 +68,6 @@ export default function App() {
         d.id === deckId
           ? {
             ...d,
-            count: d.count + 1,
             cards: [...d.cards, newCard]
           }
           : d
@@ -82,7 +81,6 @@ export default function App() {
         d.id === deckId
           ? {
             ...d,
-            count: Math.max(0, d.count - 1),
             cards: d.cards.filter(c => c.id !== cardId)
           }
           : d
@@ -96,7 +94,6 @@ export default function App() {
       id: newDeckId,
       title: `New Deck ${decks.length + 1}`,
       description: "Custom flashcard collection",
-      count: 0,
       due: 0,
       enabled: true,
       cards: []

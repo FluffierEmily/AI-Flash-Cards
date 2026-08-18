@@ -30,7 +30,6 @@ export function sanitizeDeck(deck: any): Deck {
   const sanitized: Deck = {
     id: String(deck.id || ""),
     title: String(deck.title || ""),
-    count: typeof deck.count === "number" ? deck.count : cards.length,
     due: typeof deck.due === "number" ? deck.due : 0,
     enabled: typeof deck.enabled === "boolean" ? deck.enabled : true,
     cards
