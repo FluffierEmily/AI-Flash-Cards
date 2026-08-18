@@ -22,6 +22,7 @@ import { Dashboard } from "./components/Dashboard"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
+import { saveReviewHistoryRecord } from "./lib/historyStorage"
 
 export default function App() {
   // Decks & Deck Editor State
@@ -612,18 +613,36 @@ export default function App() {
                 cards={reviewQueue}
                 onClose={() => setIsReviewing(false)}
                 onReviewCard={(cardId, rating) => {
+                  let cardToReview = null
+                  for (const deck of decks) {
+                    const card = deck.cards.find(c => c.id === cardId)
+                    if (card) {
+                      cardToReview = card
+                      break
+                    }
+                  }
+
+                  if (!cardToReview) return
+
+                  const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
+
+                  const historyRecord = {
+                    id: `${cardId}_${new Date(newHistoryEntry.timestamp).getTime()}`,
+                    ...newHistoryEntry
+                  }
+                  saveReviewHistoryRecord(historyRecord).catch(err => {
+                    console.error("Failed to save review history to IndexedDB", err)
+                  })
+
                   setDecks(prevDecks => {
                     return prevDecks.map(deck => {
                       const cardIndex = deck.cards.findIndex(c => c.id === cardId)
                       if (cardIndex === -1) return deck
 
                       const updatedCards = [...deck.cards]
-                      const oldCard = updatedCards[cardIndex]
-                      const newReviewStats = calculateNextReview(oldCard, rating)
-                      
                       updatedCards[cardIndex] = {
-                        ...oldCard,
-                        ...newReviewStats
+                        ...updatedCards[cardIndex],
+                        ...schedulingFields
                       }
 
                       return {

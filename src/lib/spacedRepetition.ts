@@ -1,4 +1,4 @@
-import type { Flashcard, MasteryLevel, ReviewHistoryEntry } from "../components/Flashcard/Flashcard"
+import type { Flashcard, MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
 import type { SettingsState } from "../components/Settings"
 import { fcmCloudService } from "./fcm"
@@ -25,7 +25,7 @@ export function calculateNextReview(
   nextReviewDate: string
   lastReviewed: string
   masteryLevel: MasteryLevel
-  history: ReviewHistoryEntry[]
+  newHistoryEntry: Omit<ReviewHistoryRecord, "id">
 } {
   let interval = card.interval || 0
   let repetition = card.repetition || 0
@@ -100,14 +100,15 @@ export function calculateNextReview(
   const nextReviewDate = nextReview.toISOString()
 
   // Construct history entry
-  const historyEntry: ReviewHistoryEntry = {
+  const historyEntry: Omit<ReviewHistoryRecord, "id"> = {
+    cardId: card.id,
+    deckId: card.deckId,
     timestamp: lastReviewed,
     rating,
     easeFactor: prevEaseFactor,
-    interval: prevInterval
+    interval: prevInterval,
+    masteryLevel
   }
-
-  const history = [...(card.history || []), historyEntry]
 
   return {
     interval,
@@ -116,7 +117,7 @@ export function calculateNextReview(
     nextReviewDate,
     lastReviewed,
     masteryLevel,
-    history
+    newHistoryEntry: historyEntry
   }
 }
 

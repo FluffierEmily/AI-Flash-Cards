@@ -2,11 +2,15 @@ export type Difficulty = "easy" | "medium" | "hard"
 
 export type MasteryLevel = "weakness" | "slipUp" | "learning" | "proficient" | "mastered"
 
-export type ReviewHistoryEntry = {
+export type ReviewHistoryRecord = {
+  id: string
+  cardId: string
+  deckId: string
   timestamp: string
   rating: "again" | "hard" | "good" | "easy"
   easeFactor: number
   interval: number
+  masteryLevel: MasteryLevel
 }
 
 export type Flashcard = {
@@ -23,5 +27,4 @@ export type Flashcard = {
     nextReviewDate?: string
     lastReviewed?: string
     hints?: string[]
-    history?: ReviewHistoryEntry[]
 }

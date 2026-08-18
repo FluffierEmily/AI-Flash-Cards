@@ -37,14 +37,6 @@ export function sanitizeFlashcard(card: any): Flashcard {
   if (Array.isArray(card.hints)) {
     sanitized.hints = card.hints.map((h: any) => String(h))
   }
-  if (Array.isArray(card.history)) {
-    sanitized.history = card.history.map((h: any) => ({
-      timestamp: String(h.timestamp || ""),
-      rating: h.rating,
-      easeFactor: typeof h.easeFactor === "number" ? h.easeFactor : 2.5,
-      interval: typeof h.interval === "number" ? h.interval : 0
-    }))
-  }
   return sanitized;
 }
 

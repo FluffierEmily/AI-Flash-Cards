@@ -1,7 +1,7 @@
 import type { EncryptedPayload } from "./crypto"
 
 const DB_NAME = "ai_flash_cards_db"
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE_NAME = "settings"
 const API_KEY_RECORD_ID = "encrypted_gemini_api_key"
 
@@ -16,6 +16,13 @@ export function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains("decks")) {
         db.createObjectStore("decks")
+      }
+      if (!db.objectStoreNames.contains("review_history")) {
+        const historyStore = db.createObjectStore("review_history", { keyPath: "id" })
+        historyStore.createIndex("cardId", "cardId", { unique: false })
+        historyStore.createIndex("deckId", "deckId", { unique: false })
+        historyStore.createIndex("timestamp", "timestamp", { unique: false })
+        historyStore.createIndex("deckId_timestamp", ["deckId", "timestamp"], { unique: false })
       }
     }
 
