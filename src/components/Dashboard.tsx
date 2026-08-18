@@ -19,6 +19,7 @@ import {
   ChevronRight,
   HelpCircle
 } from "lucide-react"
+import type { MasteryLevel } from "./Flashcard/Flashcard"
 
 // Types for props
 interface DashboardProps {
@@ -81,7 +82,7 @@ const MASTERY_DATA = {
 }
 
 interface StatusConfig {
-  key: "weakness" | "slipUp" | "learning" | "proficient" | "mastered"
+  key: MasteryLevel
   label: string
   color: string
   borderColor: string
@@ -131,7 +132,7 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
   const latestHistory = MASTERY_DATA.days[MASTERY_DATA.days.length - 1] as Record<string, any>
 
   // Mastery line visibility toggle state
-  const [visibleStatus, setVisibleStatus] = useState<Record<string, boolean>>({
+  const [visibleStatus, setVisibleStatus] = useState<Record<MasteryLevel, boolean>>({
     weakness: true,
     slipUp: true,
     learning: true,
@@ -145,7 +146,7 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
   // Selected interval state for mastery progression history ("days" | "weeks" | "months")
   const [selectedMasteryInterval, setSelectedMasteryInterval] = useState<"days" | "weeks" | "months">("days")
 
-  const toggleStatusVisibility = (statusKey: string) => {
+  const toggleStatusVisibility = (statusKey: MasteryLevel) => {
     setVisibleStatus(prev => ({
       ...prev,
       [statusKey]: !prev[statusKey]
@@ -182,7 +183,8 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
             </div>
             <button
               onClick={onStartReview}
-              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-95 shadow-sm shadow-primary/25 cursor-pointer group"
+              disabled={totalDue === 0}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-95 shadow-sm shadow-primary/25 disabled:opacity-50 disabled:pointer-events-none cursor-pointer group"
             >
               <Play className="h-4 w-4 fill-current group-hover:scale-110 transition-transform duration-200" />
               <span>Start Review</span>

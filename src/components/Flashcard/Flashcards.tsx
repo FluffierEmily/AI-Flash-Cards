@@ -37,17 +37,28 @@ export const SAMPLE_CARDS: Flashcard[] = [
   }
 ]
 
-interface DummyFlashCardProps {
-  onClose?: () => void
+export interface FlashcardReviewProps {
+  cards: Flashcard[]
+  onReviewCard: (cardId: string, rating: "again" | "hard" | "good" | "easy") => void
+  onClose: () => void
 }
 
-export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
+export function FlashcardReview({ cards = [], onReviewCard, onClose }: FlashcardReviewProps) {
   const [activeCardIndex, setActiveCardIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [userAnswer, setUserAnswer] = useState("")
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evalResult, setEvalResult] = useState<{ score: number; feedback: string } | null>(null)
   const [revealedHints, setRevealedHints] = useState<Record<number, boolean>>({})
+
+  // Stats for completion screen
+  const [stats, setStats] = useState({
+    again: 0,
+    hard: 0,
+    good: 0,
+    easy: 0,
+    totalReviews: 0
+  })
 
   // Reset revealed hints when card changes
   useEffect(() => {
@@ -59,6 +70,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
   const backRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (activeCardIndex >= cards.length) return
     const activeElement = isFlipped ? backRef.current : frontRef.current
     if (!activeElement) return
 
@@ -70,15 +82,82 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
 
     resizeObserver.observe(activeElement)
     return () => resizeObserver.disconnect()
-  }, [isFlipped, userAnswer, evalResult, activeCardIndex])
+  }, [isFlipped, userAnswer, evalResult, activeCardIndex, cards.length])
 
-  const activeCard = SAMPLE_CARDS[activeCardIndex]
+  if (cards.length === 0) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 shadow-sm text-center space-y-4 max-w-md mx-auto">
+        <CheckCircle22 className="h-12 w-12 text-emerald-500 mx-auto" />
+        <h2 className="font-display text-xl font-bold text-foreground">All caught up!</h2>
+        <p className="text-sm text-muted-foreground">There are no due flashcards to review right now.</p>
+        <button
+          onClick={onClose}
+          className="w-full rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-95 transition-all cursor-pointer"
+        >
+          Go Back
+        </button>
+      </div>
+    )
+  }
 
-  const handleNextCard = () => {
+  function CheckCircle22(props: any) {
+    return <CheckCircle2 {...props} />
+  }
+
+  if (activeCardIndex >= cards.length) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 shadow-sm text-center space-y-6 max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-3 duration-300">
+        <div className="h-16 w-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
+          <CheckCircle2 className="h-8 w-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="font-display text-2xl font-bold text-foreground">Review Session Complete! 🎉</h2>
+          <p className="text-sm text-muted-foreground">You have finished reviewing all cards in this session.</p>
+        </div>
+        <div className="grid grid-cols-4 gap-2 bg-secondary/30 p-4 rounded-2xl border border-border/40">
+          <div className="text-center">
+            <span className="block text-lg font-bold text-red-500">{stats.again}</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase">Again</span>
+          </div>
+          <div className="text-center">
+            <span className="block text-lg font-bold text-amber-500">{stats.hard}</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase">Hard</span>
+          </div>
+          <div className="text-center">
+            <span className="block text-lg font-bold text-blue-500">{stats.good}</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase">Good</span>
+          </div>
+          <div className="text-center">
+            <span className="block text-lg font-bold text-emerald-500">{stats.easy}</span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase">Easy</span>
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Total cards studied: <span className="font-semibold text-foreground">{stats.totalReviews}</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground hover:opacity-95 transition-all cursor-pointer shadow-sm shadow-primary/25"
+        >
+          Finish & Return to Dashboard
+        </button>
+      </div>
+    )
+  }
+
+  const activeCard = cards[activeCardIndex]
+
+  const handleScore = (rating: "again" | "hard" | "good" | "easy") => {
+    setStats((prev) => ({
+      ...prev,
+      [rating]: prev[rating] + 1,
+      totalReviews: prev.totalReviews + 1
+    }))
+    onReviewCard(activeCard.id, rating)
     setIsFlipped(false)
     setEvalResult(null)
     setUserAnswer("")
-    setActiveCardIndex((prev) => (prev + 1) % SAMPLE_CARDS.length)
+    setActiveCardIndex((prev) => prev + 1)
   }
 
   const simulateAIEvaluation = () => {
@@ -323,7 +402,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {/* Again Button */}
                 <button
-                  onClick={handleNextCard}
+                  onClick={() => handleScore("again")}
                   className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-red-600 dark:text-red-400 hover:border-red-500 dark:hover:border-red-400 hover:bg-red-500/20 dark:hover:bg-red-400/5 border border-border shadow-sm"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -332,7 +411,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
 
                 {/* Hard Button */}
                 <button
-                  onClick={handleNextCard}
+                  onClick={() => handleScore("hard")}
                   className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-amber-600 dark:text-amber-400 hover:border-amber-500 dark:hover:border-amber-400 hover:bg-amber-500/20 dark:hover:bg-amber-400/5 border border-border shadow-sm"
                 >
                   <Meh className="h-4 w-4" />
@@ -341,7 +420,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
 
                 {/* Good Button */}
                 <button
-                  onClick={handleNextCard}
+                  onClick={() => handleScore("good")}
                   className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-blue-600 dark:text-blue-400 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-500/20 dark:hover:bg-blue-400/5 border border-border shadow-sm"
                 >
                   <Smile className="h-4 w-4" />
@@ -350,7 +429,7 @@ export function DummyFlashCard({ onClose }: DummyFlashCardProps = {}) {
 
                 {/* Easy Button */}
                 <button
-                  onClick={handleNextCard}
+                  onClick={() => handleScore("easy")}
                   className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-emerald-600 dark:text-emerald-400 hover:border-emerald-500 dark:hover:border-emerald-400 hover:bg-emerald-500/20 dark:hover:bg-emerald-400/5 border border-border shadow-sm"
                 >
                   <Zap className="h-4 w-4" />

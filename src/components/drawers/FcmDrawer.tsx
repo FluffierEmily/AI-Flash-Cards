@@ -3,6 +3,7 @@ import { Bell, Copy, Check, AlertCircle, ExternalLink, ChevronDown, ChevronUp, T
 import { initializeApp, getApp, getApps } from "firebase/app"
 import { getMessaging, getToken, deleteToken } from "firebase/messaging"
 import { fcmCloudService } from "../../lib/fcm"
+import type { LocalReminder } from "../../lib/spacedRepetition"
 
 export interface FirebaseConfig {
   apiKey: string
@@ -16,9 +17,18 @@ export interface FirebaseConfig {
 export interface FcmDrawerProps {
   isFcmEnabled: boolean
   fcmToken: string | null
+  firebaseConfig: FirebaseConfig | null
   handleEnableFcm: (config: FirebaseConfig, vapidKey: string) => Promise<void>
-  handleDisableFcm: () => void
+  handleDisableFcm: () => Promise<void>
+  scheduledReminders: LocalReminder[]
+  setScheduledReminders: React.Dispatch<React.SetStateAction<LocalReminder[]>>
+  cancelScheduledReminder: (reminder: LocalReminder) => Promise<void>
+  triggerCloudScheduledNotification: () => Promise<void>
+  useLocalEmulator: boolean
+  setUseLocalEmulator: React.Dispatch<React.SetStateAction<boolean>>
 }
+
+
 
 function parseFirebaseConfig(text: string): Partial<FirebaseConfig> {
   const extract = (key: string) => {
@@ -213,7 +223,110 @@ export function useFcm() {
       setFcmToken(null)
       localStorage.removeItem("fcm_token")
       localStorage.setItem("fcm_enabled", "false")
-      setStatus(firebaseConfig ? "unconfigured" : "unconfigured")
+      setStatus("unconfigured")
+    }
+  }
+
+  // Refactored states & effects from FcmDrawer component
+  const [useLocalEmulator, setUseLocalEmulator] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fcm_use_emulator") !== "false"
+    }
+    return true
+  })
+
+  const [scheduledReminders, setScheduledReminders] = useState<LocalReminder[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("fcm_scheduled_reminders")
+        if (saved) {
+          const parsed = JSON.parse(saved) as LocalReminder[]
+          const now = Date.now()
+          const active = parsed.filter(r => r.sendAt > now)
+          if (active.length !== parsed.length) {
+            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
+          }
+          return active
+        }
+      } catch (err) {
+        console.error("Failed to load initial reminders:", err)
+      }
+    }
+    return []
+  })
+
+  // Prune storage every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem("fcm_scheduled_reminders")
+        if (saved) {
+          const parsed = JSON.parse(saved) as LocalReminder[]
+          const now = Date.now()
+          const active = parsed.filter(r => r.sendAt > now)
+          if (active.length !== parsed.length) {
+            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
+            setScheduledReminders(active)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to prune reminders:", err)
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Persist emulator setting
+  useEffect(() => {
+    localStorage.setItem("fcm_use_emulator", String(useLocalEmulator))
+  }, [useLocalEmulator])
+
+  const cancelScheduledReminder = async (reminder: LocalReminder) => {
+    const projectId = firebaseConfig?.projectId
+    if (!projectId) return
+    try {
+      await fcmCloudService.cancelReminder(projectId, reminder.taskId, reminder.useLocalEmulator)
+      
+      const saved = localStorage.getItem("fcm_scheduled_reminders")
+      const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
+      const updated = currentReminders.filter(r => r.taskId !== reminder.taskId)
+      localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
+      setScheduledReminders(updated)
+    } catch (err) {
+      console.error("Failed to cancel scheduled reminder:", err)
+      throw err
+    }
+  }
+
+  const triggerCloudScheduledNotification = async () => {
+    const projectId = firebaseConfig?.projectId
+    if (!fcmToken || !projectId) {
+      throw new Error("FCM not fully configured.")
+    }
+    const sendAtTimestamp = Date.now() + 10 * 1000
+    const response = await fcmCloudService.scheduleReminder(projectId, {
+      fcmToken,
+      sendAtTimestamp,
+      title: "Scheduled Cloud Test ⏰",
+      body: "Hello! This scheduled push notification has arrived after 10 seconds."
+    }, useLocalEmulator)
+
+    if (response && response.success && response.taskId) {
+      const newReminder: LocalReminder = {
+        id: Math.random().toString(36).substring(2, 9),
+        taskId: response.taskId,
+        title: "Scheduled Cloud Test ⏰",
+        body: "Hello! This scheduled push notification has arrived after 10 seconds.",
+        sendAt: sendAtTimestamp,
+        useLocalEmulator: useLocalEmulator
+      }
+      
+      const saved = localStorage.getItem("fcm_scheduled_reminders")
+      const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
+      const updated = [...currentReminders, newReminder]
+      localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
+      setScheduledReminders(updated)
     }
   }
 
@@ -225,7 +338,13 @@ export function useFcm() {
     status,
     errorMsg,
     handleEnableFcm,
-    handleDisableFcm
+    handleDisableFcm,
+    scheduledReminders,
+    setScheduledReminders,
+    cancelScheduledReminder,
+    triggerCloudScheduledNotification,
+    useLocalEmulator,
+    setUseLocalEmulator
   }
 }
 
@@ -233,7 +352,12 @@ export function FcmDrawer({
   isFcmEnabled,
   fcmToken,
   handleEnableFcm,
-  handleDisableFcm
+  handleDisableFcm,
+  scheduledReminders,
+  cancelScheduledReminder,
+  triggerCloudScheduledNotification,
+  useLocalEmulator,
+  setUseLocalEmulator
 }: FcmDrawerProps) {
   // Local form state initialized from localstorage if available
   const [apiKey, setApiKey] = useState(() => {
@@ -386,64 +510,11 @@ export function FcmDrawer({
     }
   }
 
-  type LocalReminder = {
-    id: string
-    taskId: string
-    title: string
-    body: string
-    sendAt: number
-    useLocalEmulator: boolean
-  }
-
   const [isCloudSending, setIsCloudSending] = useState(false)
   const [isCloudScheduling, setIsCloudScheduling] = useState(false)
-  const [useLocalEmulator, setUseLocalEmulator] = useState(true)
   const [cloudStatus, setCloudStatus] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  
-  const [scheduledReminders, setScheduledReminders] = useState<LocalReminder[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("fcm_scheduled_reminders")
-        if (saved) {
-          const parsed = JSON.parse(saved) as LocalReminder[]
-          const now = Date.now()
-          const active = parsed.filter(r => r.sendAt > now)
-          if (active.length !== parsed.length) {
-            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
-          }
-          return active
-        }
-      } catch (err) {
-        console.error("Failed to load initial reminders:", err)
-      }
-    }
-    return []
-  })
-
   const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
-
-  // Prune storage every 10 seconds as requested
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        const saved = localStorage.getItem("fcm_scheduled_reminders")
-        if (saved) {
-          const parsed = JSON.parse(saved) as LocalReminder[]
-          const now = Date.now()
-          const active = parsed.filter(r => r.sendAt > now)
-          if (active.length !== parsed.length) {
-            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
-            setScheduledReminders(active)
-          }
-        }
-      } catch (err) {
-        console.error("Failed to prune reminders:", err)
-      }
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   // Keep countdown timer ticking dynamically
   useEffect(() => {
@@ -453,23 +524,15 @@ export function FcmDrawer({
     return () => clearInterval(timer)
   }, [])
 
-  const cancelScheduledReminder = async (reminder: LocalReminder) => {
+  const handleCancelScheduledReminder = async (reminder: LocalReminder) => {
     if (!projectId) return
     setCancellingTaskId(reminder.taskId)
     try {
-      await fcmCloudService.cancelReminder(projectId, reminder.taskId, reminder.useLocalEmulator)
-      
-      // Update local storage and state
-      const saved = localStorage.getItem("fcm_scheduled_reminders")
-      const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
-      const updated = currentReminders.filter(r => r.taskId !== reminder.taskId)
-      localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
-      setScheduledReminders(updated)
-      
+      await cancelScheduledReminder(reminder)
       setCloudStatus({ type: "success", text: "Successfully cancelled scheduled reminder!" })
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      const errorMsg = err instanceof Error ? err.message : String(err)
+      const errorMsg = err.message || String(err)
       setCloudStatus({ type: "error", text: `Failed to cancel reminder: ${errorMsg}` })
     } finally {
       setCancellingTaskId(null)
@@ -504,7 +567,7 @@ export function FcmDrawer({
     }
   }
 
-  const triggerCloudScheduledNotification = async () => {
+  const handleTriggerCloudScheduledNotification = async () => {
     if (!fcmToken) {
       setLocalError("FCM registration token is required. Please enable Push Notifications first.")
       return
@@ -517,36 +580,11 @@ export function FcmDrawer({
     setIsCloudScheduling(true)
     setCloudStatus(null)
     try {
-      // Schedule reminder 10 seconds in the future
-      const sendAtTimestamp = Date.now() + 10 * 1000
-      const response = await fcmCloudService.scheduleReminder(projectId, {
-        fcmToken,
-        sendAtTimestamp,
-        title: "Scheduled Cloud Test ⏰",
-        body: "Hello! This scheduled push notification has arrived after 10 seconds."
-      }, useLocalEmulator)
-
-      if (response && response.success && response.taskId) {
-        const newReminder: LocalReminder = {
-          id: Math.random().toString(36).substring(2, 9),
-          taskId: response.taskId,
-          title: "Scheduled Cloud Test ⏰",
-          body: "Hello! This scheduled push notification has arrived after 10 seconds.",
-          sendAt: sendAtTimestamp,
-          useLocalEmulator: useLocalEmulator
-        }
-        
-        const saved = localStorage.getItem("fcm_scheduled_reminders")
-        const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
-        const updated = [...currentReminders, newReminder]
-        localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
-        setScheduledReminders(updated)
-      }
-
+      await triggerCloudScheduledNotification()
       setCloudStatus({ type: "success", text: `Successfully scheduled reminder for 10s from now via ${useLocalEmulator ? "Emulator" : "Production"}!` })
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      const errorMsg = err instanceof Error ? err.message : String(err)
+      const errorMsg = err.message || String(err)
       setCloudStatus({ type: "error", text: `Cloud Schedule Failed: ${errorMsg}` })
     } finally {
       setIsCloudScheduling(false)
@@ -813,7 +851,7 @@ export function FcmDrawer({
                 {isCloudSending ? "Sending..." : "Cloud Send"}
               </button>
               <button
-                onClick={triggerCloudScheduledNotification}
+                onClick={handleTriggerCloudScheduledNotification}
                 disabled={isCloudSending || isCloudScheduling}
                 className="h-10 flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
               >
@@ -858,7 +896,7 @@ export function FcmDrawer({
                           </p>
                         </div>
                         <button
-                          onClick={() => cancelScheduledReminder(reminder)}
+                          onClick={() => handleCancelScheduledReminder(reminder)}
                           disabled={cancellingTaskId === reminder.taskId}
                           className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-50 cursor-pointer"
                           title="Cancel scheduled reminder"

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Plus, Trash2, Search, X, Pencil, Check, Layers } from "lucide-react"
+import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play } from "lucide-react"
 import type { Deck } from "./Deck"
 import { AddFlashcardModal } from "../Flashcard/AddFlashcardModal"
 import { EditFlashcardModal } from "../Flashcard/EditFlashcardModal"
@@ -11,6 +11,9 @@ interface DeckViewerProps {
   onUpdateDeck: (deckId: string, updates: Partial<Deck>) => void
   onAddCard: (deckId: string, card: Flashcard) => void
   onDeleteCard: (deckId: string, cardId: string) => void
+  onStartReviewDeck?: (deckId: string) => void
+  dueCount?: number
+  onDeleteDeck: (deckId: string) => void
 }
 
 export function DeckViewer({
@@ -19,12 +22,16 @@ export function DeckViewer({
   onUpdateDeck,
   onAddCard,
   onDeleteCard,
+  onStartReviewDeck,
+  dueCount,
+  onDeleteDeck,
 }: DeckViewerProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [selectedCardForEdit, setSelectedCardForEdit] = useState<Flashcard | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleUpdateCard = (updatedCard: Flashcard) => {
     const updatedCards = currentDeck.cards.map((c) =>
@@ -101,6 +108,16 @@ export function DeckViewer({
         </div>
 
         <div className="flex items-center gap-2">
+          {onStartReviewDeck && dueCount !== undefined && dueCount > 0 && (
+            <button
+              onClick={() => onStartReviewDeck(currentDeck.id)}
+              className="flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-95 cursor-pointer shadow-sm shadow-primary/20"
+              title="Review due cards in this deck"
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>Review ({dueCount})</span>
+            </button>
+          )}
           <button
             onClick={onClose}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
@@ -233,6 +250,21 @@ export function DeckViewer({
         )}
       </div>
 
+      {/* Danger Zone */}
+      <div className="border-t border-border/60 pt-6 mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-rose-500">Danger Zone</h4>
+          <p className="text-xs text-muted-foreground mt-1">Permanently delete this deck and all of its flashcards.</p>
+        </div>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500 hover:text-white text-rose-500 text-xs font-semibold transition-all duration-200 cursor-pointer active:scale-95 shadow-sm shadow-rose-500/5 shrink-0"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          <span>Delete Entire Deck</span>
+        </button>
+      </div>
+
       {/* Add Flashcard Modal */}
       <AddFlashcardModal
         isOpen={isAddModalOpen}
@@ -248,6 +280,61 @@ export function DeckViewer({
         card={selectedCardForEdit ? currentDeck.cards.find(c => c.id === selectedCardForEdit.id) || null : null}
         onUpdateCard={handleUpdateCard}
       />
+
+      {/* Delete Deck Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowDeleteConfirm(false)}
+            className="fixed inset-0 bg-background/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            aria-hidden="true"
+          />
+
+          {/* Modal Dialog */}
+          <div
+            className="relative z-10 w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 space-y-6"
+            role="dialog"
+            aria-labelledby="delete-deck-modal-title"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="delete-deck-modal-title" className="font-display text-lg font-bold text-foreground">
+                  Delete Deck
+                </h3>
+                <p className="text-xs text-muted-foreground">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground/90 leading-relaxed">
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{currentDeck.title}"</span>? All {currentDeck.cards.length} cards in this deck will be permanently removed.
+            </p>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  onDeleteDeck(currentDeck.id)
+                }}
+                className="px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all cursor-pointer"
+              >
+                Delete Deck
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 text-xs font-semibold text-white hover:bg-rose-500 active:scale-95 transition-all shadow-sm shadow-rose-600/20 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

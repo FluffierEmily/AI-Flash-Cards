@@ -16,8 +16,34 @@ export function sanitizeFlashcard(card: any): Flashcard {
   if (card.difficulty) {
     sanitized.difficulty = card.difficulty
   }
+  if (card.masteryLevel) {
+    sanitized.masteryLevel = card.masteryLevel
+  }
+  if (typeof card.interval === "number") {
+    sanitized.interval = card.interval
+  }
+  if (typeof card.repetition === "number") {
+    sanitized.repetition = card.repetition
+  }
+  if (typeof card.easeFactor === "number") {
+    sanitized.easeFactor = card.easeFactor
+  }
+  if (card.nextReviewDate) {
+    sanitized.nextReviewDate = String(card.nextReviewDate)
+  }
+  if (card.lastReviewed) {
+    sanitized.lastReviewed = String(card.lastReviewed)
+  }
   if (Array.isArray(card.hints)) {
     sanitized.hints = card.hints.map((h: any) => String(h))
+  }
+  if (Array.isArray(card.history)) {
+    sanitized.history = card.history.map((h: any) => ({
+      timestamp: String(h.timestamp || ""),
+      rating: h.rating,
+      easeFactor: typeof h.easeFactor === "number" ? h.easeFactor : 2.5,
+      interval: typeof h.interval === "number" ? h.interval : 0
+    }))
   }
   return sanitized;
 }

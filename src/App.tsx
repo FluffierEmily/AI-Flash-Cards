@@ -14,13 +14,14 @@ import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
 import { useFcm } from "./components/drawers/FcmDrawer"
 import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
-import { DummyFlashCard } from "./components/Flashcard/Flashcards"
+import { FlashcardReview } from "./components/Flashcard/Flashcards"
 import { DummyDecks, INITIAL_DECKS } from "./components/Deck/Decks"
 import { type Deck } from "./components/Deck/Deck"
 import { DeckViewer } from "./components/Deck/DeckViewer"
 import { Dashboard } from "./components/Dashboard"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
+import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
 
 export default function App() {
   // Decks & Deck Editor State
@@ -102,6 +103,13 @@ export default function App() {
     setEditingDeckId(newDeckId)
     setIsReviewing(false)
   }
+
+  const handleDeleteDeck = (deckId: string) => {
+    setDecks(prev => prev.filter(d => d.id !== deckId))
+    if (editingDeckId === deckId) {
+      setEditingDeckId(null)
+    }
+  }
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme")
@@ -179,7 +187,45 @@ export default function App() {
   })
 
   // FCM State
-  const { isFcmEnabled, fcmToken, handleEnableFcm, handleDisableFcm } = useFcm()
+  const {
+    isFcmEnabled,
+    fcmToken,
+    firebaseConfig,
+    useLocalEmulator,
+    scheduledReminders,
+    setScheduledReminders,
+    cancelScheduledReminder,
+    triggerCloudScheduledNotification,
+    handleEnableFcm,
+    handleDisableFcm,
+    setUseLocalEmulator
+  } = useFcm()
+
+  // Spaced Repetition Queue & Filter State
+  const [reviewQueue, setReviewQueue] = useState<any[]>([])
+
+  // Sync FCM Reminders whenever decks, settings, or FCM state changes
+  useEffect(() => {
+    if (hasLoadedDecks && isFcmEnabled && fcmToken && firebaseConfig?.projectId) {
+      syncFcmReminders(
+        decks,
+        settings,
+        fcmToken,
+        firebaseConfig.projectId,
+        useLocalEmulator,
+        setScheduledReminders
+      ).catch((err) => console.error("Failed to sync FCM reminders:", err))
+    }
+  }, [
+    decks,
+    hasLoadedDecks,
+    isFcmEnabled,
+    fcmToken,
+    firebaseConfig,
+    useLocalEmulator,
+    settings.reminderInterval,
+    settings.spacedRepetition
+  ])
 
 
   // Theme Sync
@@ -345,7 +391,12 @@ export default function App() {
 
 
 
-  const totalReviewsDue = decks.filter(d => d.enabled).reduce((acc, deck) => acc + deck.due, 0)
+  const decksWithDueCounts = decks.map(d => ({
+    ...d,
+    due: getDeckDueCount(d, settings)
+  }))
+
+  const totalReviewsDue = decksWithDueCounts.filter(d => d.enabled).reduce((acc, deck) => acc + deck.due, 0)
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans selection:bg-primary/30 relative">
@@ -527,7 +578,7 @@ export default function App() {
           {/* Your Decks Sidebar - Left Column */}
           <div className="flex flex-col gap-6 lg:col-span-1">
             <DummyDecks
-              decks={decks}
+              decks={decksWithDueCounts}
               editingDeckId={editingDeckId}
               onSelectDeck={(id) => {
                 setEditingDeckId(id)
@@ -547,13 +598,50 @@ export default function App() {
                 onUpdateDeck={handleUpdateDeck}
                 onAddCard={handleAddCardToDeck}
                 onDeleteCard={handleDeleteCardFromDeck}
+                dueCount={getDeckDueCount(decks.find(d => d.id === editingDeckId)!, settings)}
+                onStartReviewDeck={(deckId) => {
+                  const queue = getReviewQueue(decks, settings, deckId)
+                  setReviewQueue(queue)
+                  setIsReviewing(true)
+                  setEditingDeckId(null)
+                }}
+                onDeleteDeck={handleDeleteDeck}
               />
             ) : isReviewing ? (
-              <DummyFlashCard onClose={() => setIsReviewing(false)} />
+              <FlashcardReview
+                cards={reviewQueue}
+                onClose={() => setIsReviewing(false)}
+                onReviewCard={(cardId, rating) => {
+                  setDecks(prevDecks => {
+                    return prevDecks.map(deck => {
+                      const cardIndex = deck.cards.findIndex(c => c.id === cardId)
+                      if (cardIndex === -1) return deck
+
+                      const updatedCards = [...deck.cards]
+                      const oldCard = updatedCards[cardIndex]
+                      const newReviewStats = calculateNextReview(oldCard, rating)
+                      
+                      updatedCards[cardIndex] = {
+                        ...oldCard,
+                        ...newReviewStats
+                      }
+
+                      return {
+                        ...deck,
+                        cards: updatedCards
+                      }
+                    })
+                  })
+                }}
+              />
             ) : (
               <Dashboard
                 totalDue={totalReviewsDue}
-                onStartReview={() => setIsReviewing(true)}
+                onStartReview={() => {
+                  const queue = getReviewQueue(decks, settings, null)
+                  setReviewQueue(queue)
+                  setIsReviewing(true)
+                }}
               />
             )}
           </div>
@@ -596,8 +684,15 @@ export default function App() {
         fcmProps={{
           isFcmEnabled,
           fcmToken,
+          firebaseConfig,
           handleEnableFcm,
-          handleDisableFcm
+          handleDisableFcm,
+          scheduledReminders,
+          setScheduledReminders,
+          cancelScheduledReminder,
+          triggerCloudScheduledNotification,
+          useLocalEmulator,
+          setUseLocalEmulator
         }}
       />
 
