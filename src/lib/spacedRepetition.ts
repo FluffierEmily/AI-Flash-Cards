@@ -25,7 +25,7 @@ export function calculateNextReview(
   nextReviewDate: string
   lastReviewed: string
   masteryLevel: MasteryLevel
-  newHistoryEntry: Omit<ReviewHistoryRecord, "id">
+  newHistoryEntry: ReviewHistoryRecord
 } {
   let interval = card.interval || 0
   let repetition = card.repetition || 0
@@ -100,7 +100,7 @@ export function calculateNextReview(
   const nextReviewDate = nextReview.toISOString()
 
   // Construct history entry
-  const historyEntry: Omit<ReviewHistoryRecord, "id"> = {
+  const historyEntry: ReviewHistoryRecord = {
     cardId: card.id,
     deckId: card.deckId,
     timestamp: lastReviewed,

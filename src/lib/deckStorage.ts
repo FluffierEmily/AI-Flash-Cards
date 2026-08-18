@@ -3,7 +3,7 @@ import type { Deck } from "../components/Deck/Deck"
 import type { Flashcard } from "../components/Flashcard/Flashcard"
 import { openDB } from "./db"
 
-const STORAGE_KEY = "flashcard_decks"
+
 
 export function sanitizeFlashcard(card: any): Flashcard {
   const sanitized: Flashcard = {
@@ -65,11 +65,11 @@ export async function loadDecks(): Promise<Deck[]> {
     return new Promise((resolve) => {
       const tx = db.transaction("decks", "readonly")
       const store = tx.objectStore("decks")
-      const request = store.get(STORAGE_KEY)
+      const request = store.getAll()
       
       request.onsuccess = () => {
         const result = request.result
-        if (result && Array.isArray(result)) {
+        if (result && Array.isArray(result) && result.length > 0) {
           resolve(result.map(sanitizeDeck))
         } else {
           resolve(INITIAL_DECKS)
@@ -95,10 +95,26 @@ export async function saveDecks(decks: Deck[]): Promise<void> {
     return new Promise((resolve, reject) => {
       const tx = db.transaction("decks", "readwrite")
       const store = tx.objectStore("decks")
-      const request = store.put(sanitized, STORAGE_KEY)
+      const keysRequest = store.getAllKeys()
       
-      request.onsuccess = () => resolve()
-      request.onerror = () => reject(request.error)
+      keysRequest.onsuccess = () => {
+        const existingKeys = keysRequest.result as string[]
+        const newKeys = sanitized.map(d => d.id)
+        
+        for (const key of existingKeys) {
+          if (!newKeys.includes(key)) {
+            store.delete(key)
+          }
+        }
+        
+        for (const deck of sanitized) {
+          store.put(deck)
+        }
+      }
+      
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+      keysRequest.onerror = () => reject(keysRequest.error)
     })
   } catch (e) {
     console.error("Failed to save decks to IndexedDB", e)

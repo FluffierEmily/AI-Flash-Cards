@@ -3,7 +3,6 @@ export type Difficulty = "easy" | "medium" | "hard"
 export type MasteryLevel = "weakness" | "slipUp" | "learning" | "proficient" | "mastered"
 
 export type ReviewHistoryRecord = {
-  id: string
   cardId: string
   deckId: string
   timestamp: string

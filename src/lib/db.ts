@@ -1,7 +1,7 @@
 import type { EncryptedPayload } from "./crypto"
 
 const DB_NAME = "ai_flash_cards_db"
-const DB_VERSION = 3
+const DB_VERSION = 5
 const STORE_NAME = "settings"
 const API_KEY_RECORD_ID = "encrypted_gemini_api_key"
 
@@ -14,16 +14,23 @@ export function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME)
       }
-      if (!db.objectStoreNames.contains("decks")) {
-        db.createObjectStore("decks")
+
+      // Upgrade decks store to use keyPath "id"
+      if (db.objectStoreNames.contains("decks")) {
+        db.deleteObjectStore("decks")
       }
-      if (!db.objectStoreNames.contains("review_history")) {
-        const historyStore = db.createObjectStore("review_history", { keyPath: "id" })
-        historyStore.createIndex("cardId", "cardId", { unique: false })
-        historyStore.createIndex("deckId", "deckId", { unique: false })
-        historyStore.createIndex("timestamp", "timestamp", { unique: false })
-        historyStore.createIndex("deckId_timestamp", ["deckId", "timestamp"], { unique: false })
+      db.createObjectStore("decks", { keyPath: "id" })
+
+      // Recreate review_history store with compound keyPath ["cardId", "timestamp"]
+      if (db.objectStoreNames.contains("review_history")) {
+        db.deleteObjectStore("review_history")
       }
+      const historyStore = db.createObjectStore("review_history", { keyPath: ["cardId", "timestamp"] })
+      historyStore.createIndex("deckId", "deckId", { unique: false })
+      historyStore.createIndex("cardId", "cardId", { unique: false })
+      historyStore.createIndex("timestamp", "timestamp", { unique: false })
+      historyStore.createIndex("deckId_timestamp", ["deckId", "timestamp"], { unique: false })
+      historyStore.createIndex("cardId_timestamp", ["cardId", "timestamp"], { unique: false })
     }
 
     request.onsuccess = () => resolve(request.result)

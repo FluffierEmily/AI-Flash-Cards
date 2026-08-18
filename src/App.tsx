@@ -626,11 +626,7 @@ export default function App() {
 
                   const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
 
-                  const historyRecord = {
-                    id: `${cardId}_${new Date(newHistoryEntry.timestamp).getTime()}`,
-                    ...newHistoryEntry
-                  }
-                  saveReviewHistoryRecord(historyRecord).catch(err => {
+                  saveReviewHistoryRecord(newHistoryEntry).catch(err => {
                     console.error("Failed to save review history to IndexedDB", err)
                   })
 
