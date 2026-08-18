@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Sparkles, Plus, Trash2, Search, X, Pencil, Check, Layers } from "lucide-react"
+import { Plus, Trash2, Search, X, Pencil, Check, Layers } from "lucide-react"
 import type { Deck } from "./Deck"
 import { AddFlashcardModal } from "../Flashcard/AddFlashcardModal"
 import { EditFlashcardModal } from "../Flashcard/EditFlashcardModal"

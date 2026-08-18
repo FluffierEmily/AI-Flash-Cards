@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { X, Check, Pencil, GripVertical, Trash2, Plus, Info } from "lucide-react"
 import type { Flashcard, Difficulty } from "./Flashcard"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
+import { loadDecks, saveDecks } from "../../lib/deckStorage"
 
 interface EditFlashcardModalProps {
   isOpen: boolean
@@ -14,8 +15,29 @@ export function EditFlashcardModal({
   isOpen,
   onClose,
   card,
-  onUpdateCard,
+  onUpdateCard: propOnUpdateCard,
 }: EditFlashcardModalProps) {
+  const onUpdateCard = (updatedCard: Flashcard) => {
+    loadDecks()
+      .then((decks) => {
+        const updatedDecks = decks.map((d) => {
+          if (d.id === updatedCard.deckId) {
+            return {
+              ...d,
+              cards: d.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c))
+            }
+          }
+          return d
+        })
+        return saveDecks(updatedDecks)
+      })
+      .catch((err) => {
+        console.error("Failed to auto-save updated flashcard to IndexedDB", err)
+      })
+
+    propOnUpdateCard(updatedCard)
+  }
+
   // Toggle states for each field
   const [isEditingQuestion, setIsEditingQuestion] = useState(false)
   const [isEditingAnswer, setIsEditingAnswer] = useState(false)
@@ -34,13 +56,12 @@ export function EditFlashcardModal({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
-  // Sync state when card updates or modal opens
   useEffect(() => {
     if (isOpen && card) {
       setQuestion(card.question)
       setAnswer(card.answer)
       setLabel(card.label || "General")
-      setDifficulty(card.difficulty)
+      setDifficulty(card.difficulty || "medium")
       setHints(card.hints || [])
       setNewHint("")
 

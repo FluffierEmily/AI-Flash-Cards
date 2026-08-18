@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { Plus, X, Check, GripVertical, Trash2 } from "lucide-react"
 import type { Flashcard, Difficulty } from "./Flashcard"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
+import { loadDecks, saveDecks } from "../../lib/deckStorage"
 
 interface AddFlashcardModalProps {
   isOpen: boolean
@@ -93,6 +94,24 @@ export function AddFlashcardModal({
       difficulty: difficulty,
       hints: hints.length > 0 ? hints : undefined,
     }
+
+    loadDecks()
+      .then((decks) => {
+        const updatedDecks = decks.map((d) => {
+          if (d.id === deckId) {
+            return {
+              ...d,
+              count: d.count + 1,
+              cards: [...d.cards, newCard]
+            }
+          }
+          return d
+        })
+        return saveDecks(updatedDecks)
+      })
+      .catch((err) => {
+        console.error("Failed to auto-save added flashcard to IndexedDB", err)
+      })
 
     onAddCard(newCard)
     onClose()

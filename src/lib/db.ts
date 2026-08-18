@@ -1,7 +1,7 @@
 import type { EncryptedPayload } from "./crypto"
 
 const DB_NAME = "ai_flash_cards_db"
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = "settings"
 const API_KEY_RECORD_ID = "encrypted_gemini_api_key"
 
