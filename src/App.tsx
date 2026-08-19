@@ -612,7 +612,7 @@ export default function App() {
               <FlashcardReview
                 cards={reviewQueue}
                 onClose={() => setIsReviewing(false)}
-                onReviewCard={(cardId, rating) => {
+                onReviewCard={(cardId, rating, reviewDuration) => {
                   let cardToReview = null
                   for (const deck of decks) {
                     const card = deck.cards.find(c => c.id === cardId)
@@ -625,6 +625,7 @@ export default function App() {
                   if (!cardToReview) return
 
                   const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
+                  newHistoryEntry.reviewDuration = reviewDuration
 
                   saveReviewHistoryRecord(newHistoryEntry).catch(err => {
                     console.error("Failed to save review history to IndexedDB", err)
@@ -651,6 +652,7 @@ export default function App() {
               />
             ) : (
               <Dashboard
+                decks={decks}
                 totalDue={totalReviewsDue}
                 onStartReview={() => {
                   const queue = getReviewQueue(decks, settings, null)

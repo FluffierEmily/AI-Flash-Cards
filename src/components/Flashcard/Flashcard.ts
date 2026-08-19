@@ -10,6 +10,7 @@ export type ReviewHistoryRecord = {
   easeFactor: number
   interval: number
   masteryLevel: MasteryLevel
+  reviewDuration?: number
 }
 
 export type Flashcard = {

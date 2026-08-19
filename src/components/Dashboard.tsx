@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   LineChart,
   Line,
@@ -19,66 +19,16 @@ import {
   ChevronRight,
   HelpCircle
 } from "lucide-react"
-import type { MasteryLevel } from "./Flashcard/Flashcard"
+import type { MasteryLevel, ReviewHistoryRecord } from "./Flashcard/Flashcard"
+import type { Deck } from "./Deck/Deck"
+import { getAllReviewHistory } from "../lib/historyStorage"
+import { getDashboardStats } from "../lib/statistics"
 
 // Types for props
 interface DashboardProps {
+  decks: Deck[]
   totalDue: number
   onStartReview: () => void
-}
-
-// Mock data for reviews done over different intervals (days, weeks, months)
-const REVIEWS_DATA = {
-  days: [
-    { label: "Fri", count: 18 },
-    { label: "Sat", count: 12 },
-    { label: "Sun", count: 8 },
-    { label: "Mon", count: 24 },
-    { label: "Tue", count: 32 },
-    { label: "Wed", count: 27 },
-    { label: "Thu", count: 42 }
-  ],
-  weeks: [
-    { label: "Week 1", count: 110 },
-    { label: "Week 2", count: 145 },
-    { label: "Week 3", count: 128 },
-    { label: "Week 4", count: 161 }
-  ],
-  months: [
-    { label: "Mar", count: 380 },
-    { label: "Apr", count: 460 },
-    { label: "May", count: 510 },
-    { label: "Jun", count: 490 },
-    { label: "Jul", count: 620 },
-    { label: "Aug", count: 680 }
-  ]
-}
-
-// Mock data for card mastery history over different intervals (days, weeks, months)
-const MASTERY_DATA = {
-  days: [
-    { label: "Fri", weakness: 12, slipUp: 8, learning: 22, proficient: 35, mastered: 45 },
-    { label: "Sat", weakness: 14, slipUp: 9, learning: 20, proficient: 37, mastered: 45 },
-    { label: "Sun", weakness: 15, slipUp: 7, learning: 18, proficient: 39, mastered: 46 },
-    { label: "Mon", weakness: 10, slipUp: 11, learning: 25, proficient: 36, mastered: 49 },
-    { label: "Tue", weakness: 8, slipUp: 12, learning: 28, proficient: 34, mastered: 52 },
-    { label: "Wed", weakness: 9, slipUp: 6, learning: 23, proficient: 40, mastered: 55 },
-    { label: "Thu", weakness: 6, slipUp: 5, learning: 19, proficient: 45, mastered: 60 }
-  ],
-  weeks: [
-    { label: "Week 1", weakness: 15, slipUp: 10, learning: 25, proficient: 32, mastered: 40 },
-    { label: "Week 2", weakness: 12, slipUp: 8, learning: 20, proficient: 36, mastered: 48 },
-    { label: "Week 3", weakness: 8, slipUp: 6, learning: 22, proficient: 40, mastered: 55 },
-    { label: "Week 4", weakness: 6, slipUp: 5, learning: 19, proficient: 45, mastered: 60 }
-  ],
-  months: [
-    { label: "Mar", weakness: 20, slipUp: 15, learning: 30, proficient: 25, mastered: 30 },
-    { label: "Apr", weakness: 18, slipUp: 12, learning: 28, proficient: 29, mastered: 35 },
-    { label: "May", weakness: 15, slipUp: 10, learning: 26, proficient: 32, mastered: 42 },
-    { label: "Jun", weakness: 10, slipUp: 8, learning: 24, proficient: 38, mastered: 49 },
-    { label: "Jul", weakness: 8, slipUp: 6, learning: 22, proficient: 42, mastered: 55 },
-    { label: "Aug", weakness: 6, slipUp: 5, learning: 19, proficient: 45, mastered: 60 }
-  ]
 }
 
 interface StatusConfig {
@@ -127,9 +77,23 @@ const STATUS_METADATA: StatusConfig[] = [
   }
 ]
 
-export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
+export function Dashboard({ decks, totalDue, onStartReview }: DashboardProps) {
+  const [history, setHistory] = useState<ReviewHistoryRecord[]>([])
+
+  useEffect(() => {
+    getAllReviewHistory()
+      .then((records) => {
+        setHistory(records)
+      })
+      .catch((err) => {
+        console.error("Failed to load review history:", err)
+      })
+  }, [])
+
+  const stats = getDashboardStats(history, decks)
+
   // Get latest mastery counts for current status display
-  const latestHistory = MASTERY_DATA.days[MASTERY_DATA.days.length - 1] as Record<string, any>
+  const latestHistory = stats.graphs.mastery.days[stats.graphs.mastery.days.length - 1] as Record<string, any>
 
   // Mastery line visibility toggle state
   const [visibleStatus, setVisibleStatus] = useState<Record<MasteryLevel, boolean>>({
@@ -155,6 +119,7 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
 
   // Helper to check if any status line is visible
   const hasVisibleMasteryLines = Object.values(visibleStatus).some(Boolean)
+
 
   return (
     <div className="space-y-6">
@@ -204,8 +169,8 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">5 Days</span>
-            <span className="block text-[10px] text-muted-foreground mt-0.5">Top streak: 12 days</span>
+            <span className="text-2xl font-bold text-foreground font-display">{stats.streak} Days</span>
+            <span className="block text-[10px] text-muted-foreground mt-0.5">Top streak: {stats.maxStreak} days</span>
           </div>
         </div>
 
@@ -217,8 +182,8 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">161</span>
-            <span className="block text-[10px] text-muted-foreground mt-0.5">Last 7 days: +42 reviews</span>
+            <span className="text-2xl font-bold text-foreground font-display">{stats.reviewsDoneTotal}</span>
+            <span className="block text-[10px] text-muted-foreground mt-0.5">Last 7 days: +{stats.reviewsDoneLast7Days} reviews</span>
           </div>
         </div>
 
@@ -230,8 +195,10 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">60 / 109</span>
-            <span className="block text-[10px] text-muted-foreground mt-0.5">55% of your catalog mastered</span>
+            <span className="text-2xl font-bold text-foreground font-display">{stats.masteryRateMastered} / {stats.masteryRateTotal}</span>
+            <span className="block text-[10px] text-muted-foreground mt-0.5">
+              {stats.masteryRateTotal > 0 ? Math.round((stats.masteryRateMastered / stats.masteryRateTotal) * 100) : 0}% of your catalog mastered
+            </span>
           </div>
         </div>
 
@@ -243,8 +210,8 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">84 mins</span>
-            <span className="block text-[10px] text-muted-foreground mt-0.5">Avg: 12 mins per day</span>
+            <span className="text-2xl font-bold text-foreground font-display">{stats.timeStudiedMins} mins</span>
+            <span className="block text-[10px] text-muted-foreground mt-0.5">Avg: {stats.timeStudiedAvgMins} mins per study day</span>
           </div>
         </div>
       </div>
@@ -337,7 +304,7 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
 
           <div className="h-[240px] w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={REVIEWS_DATA[selectedReviewsInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <LineChart data={stats.graphs.reviews[selectedReviewsInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.6} />
                 <XAxis
                   dataKey="label"
@@ -438,7 +405,7 @@ export function Dashboard({ totalDue, onStartReview }: DashboardProps) {
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={MASTERY_DATA[selectedMasteryInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <LineChart data={stats.graphs.mastery[selectedMasteryInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.6} />
                 <XAxis
                   dataKey="label"

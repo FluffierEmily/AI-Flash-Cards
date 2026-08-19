@@ -39,7 +39,7 @@ export const SAMPLE_CARDS: Flashcard[] = [
 
 export interface FlashcardReviewProps {
   cards: Flashcard[]
-  onReviewCard: (cardId: string, rating: "again" | "hard" | "good" | "easy") => void
+  onReviewCard: (cardId: string, rating: "again" | "hard" | "good" | "easy", reviewDuration: number) => void
   onClose: () => void
 }
 
@@ -60,9 +60,12 @@ export function FlashcardReview({ cards = [], onReviewCard, onClose }: Flashcard
     totalReviews: 0
   })
 
-  // Reset revealed hints when card changes
+  const cardStartTimeRef = useRef<number>(Date.now())
+
+  // Reset revealed hints and timer when card changes
   useEffect(() => {
     setRevealedHints({})
+    cardStartTimeRef.current = Date.now()
   }, [activeCardIndex])
 
   const [cardHeight, setCardHeight] = useState<number | undefined>(undefined)
@@ -153,7 +156,8 @@ export function FlashcardReview({ cards = [], onReviewCard, onClose }: Flashcard
       [rating]: prev[rating] + 1,
       totalReviews: prev.totalReviews + 1
     }))
-    onReviewCard(activeCard.id, rating)
+    const durationSec = parseFloat(((Date.now() - cardStartTimeRef.current) / 1000).toFixed(3))
+    onReviewCard(activeCard.id, rating, durationSec)
     setIsFlipped(false)
     setEvalResult(null)
     setUserAnswer("")

@@ -68,3 +68,18 @@ export async function getReviewsForDeck(deckId: string): Promise<ReviewHistoryRe
     request.onerror = () => reject(request.error)
   })
 }
+
+/**
+ * Fetches all review history records.
+ */
+export async function getAllReviewHistory(): Promise<ReviewHistoryRecord[]> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("review_history", "readonly")
+    const store = tx.objectStore("review_history")
+    const request = store.getAll()
+
+    request.onsuccess = () => resolve(request.result || [])
+    request.onerror = () => reject(request.error)
+  })
+}
