@@ -222,6 +222,6 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [x] Implement deck management and flashcard creation workflows.
 - [ ] Build the interactive review session UI (card viewer, keyboard controls).
 - [x] Integrate local spaced repetition scheduling logic.
-- [ ] Add the AI evaluation layer (LLM scoring endpoint).
+- [x] Add the AI evaluation layer (LLM scoring endpoint).
 - [x] Setup Firebase Cloud Messaging for PWA background push notifications.
 - [ ] Design statistics and progress tracking dashboards.

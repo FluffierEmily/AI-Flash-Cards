@@ -83,3 +83,18 @@ export async function getAllReviewHistory(): Promise<ReviewHistoryRecord[]> {
     request.onerror = () => reject(request.error)
   })
 }
+
+/**
+ * Deletes all review history records.
+ */
+export async function clearAllReviewHistory(): Promise<void> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("review_history", "readwrite")
+    const store = tx.objectStore("review_history")
+    const request = store.clear()
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+}
+

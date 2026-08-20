@@ -14,6 +14,8 @@ import {
   Save
 } from "lucide-react"
 
+import { DEFAULT_EVAL_PROMPT } from "../lib/aiEvaluation"
+
 export interface SettingsState {
   cardShuffle: boolean
   spacedRepetition: boolean
@@ -27,6 +29,9 @@ export interface SettingsState {
   autoHintSeconds: number // 0 = disabled
   enable3dFlip: boolean
   darkMode: boolean
+  aiEvalPrompt: string
+  aiModelProvider: string
+  aiModelName: string
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
@@ -41,7 +46,10 @@ export const DEFAULT_SETTINGS: SettingsState = {
   autoFlipSeconds: 0,
   autoHintSeconds: 0,
   enable3dFlip: true,
-  darkMode: true
+  darkMode: true,
+  aiEvalPrompt: DEFAULT_EVAL_PROMPT,
+  aiModelProvider: "Google",
+  aiModelName: "gemini-3.6-flash"
 }
 
 export interface SettingsModalProps {
@@ -51,6 +59,7 @@ export interface SettingsModalProps {
   onUpdateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
   onResetDefaults: () => void
   onOpenDrawerStep?: (step: "apiKey" | "pwa" | "fcm") => void
+  onResetData?: () => void
 }
 
 function SettingTooltip({ text }: { text: string }) {
@@ -76,7 +85,8 @@ export function SettingsModal({
   settings,
   onUpdateSetting,
   onResetDefaults,
-  onOpenDrawerStep
+  onOpenDrawerStep,
+  onResetData
 }: SettingsModalProps) {
   if (!isOpen) return null
 
@@ -415,6 +425,46 @@ export function SettingsModal({
                 placeholder="0"
               />
             </div>
+          </div>
+
+          {/* AI Evaluation Prompt Section */}
+          <div className="py-4 space-y-3 border-t border-border/40">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-500 shrink-0" />
+              <label className="text-sm font-semibold text-foreground cursor-pointer" htmlFor="input-ai-eval-prompt">
+                AI Evaluation Prompt
+              </label>
+              <SettingTooltip text="Customize the guidelines used by the AI to grade your answers. Use {question}, {referenceAnswer}, and {userAnswer} placeholder tags to inject flashcard data." />
+            </div>
+            <textarea
+              id="input-ai-eval-prompt"
+              rows={6}
+              value={settings.aiEvalPrompt}
+              onChange={(e) => onUpdateSetting("aiEvalPrompt", e.target.value)}
+              className="w-full p-3 rounded-xl border border-input bg-card text-foreground font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y leading-relaxed"
+              placeholder="Enter custom AI evaluation instructions..."
+            />
+          </div>
+
+          {/* Danger Zone Section */}
+          <div className="py-4 space-y-3 border-t border-destructive/20 bg-destructive/5 -mx-5 md:-mx-7 px-5 md:px-7">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-destructive">Danger Zone</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Resetting will clear all spaced repetition review intervals, ease factors, next review due dates, and all card review history. This action cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Are you sure you want to reset all card due dates and delete all review history? This cannot be undone.")) {
+                  onResetData?.()
+                }
+              }}
+              className="px-4 h-10 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              Reset Due Dates & History
+            </button>
           </div>
         </div>
 

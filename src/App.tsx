@@ -22,7 +22,7 @@ import { Dashboard } from "./components/Dashboard"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
-import { saveReviewHistoryRecord } from "./lib/historyStorage"
+import { saveReviewHistoryRecord, clearAllReviewHistory } from "./lib/historyStorage"
 
 export default function App() {
   // Decks & Deck Editor State
@@ -154,6 +154,38 @@ export default function App() {
     }))
   }
 
+  const handleResetData = async () => {
+    try {
+      const resetDecks = decks.map(deck => {
+        const resetCards = deck.cards.map(card => {
+          const {
+            interval,
+            repetition,
+            easeFactor,
+            nextReviewDate,
+            lastReviewed,
+            difficulty,
+            masteryLevel,
+            ...rest
+          } = card
+          return rest
+        })
+        return {
+          ...deck,
+          cards: resetCards
+        }
+      })
+
+      await clearAllReviewHistory()
+      setDecks(resetDecks)
+      setIsSettingsOpen(false)
+      alert("Review history and card progress have been successfully reset!")
+    } catch (err: any) {
+      console.error("Failed to reset due dates and history:", err)
+      alert(`Failed to reset data: ${err.message || err}`)
+    }
+  }
+
   // Setup Drawer State
   const [activeDrawerStep, setActiveDrawerStep] = useState<"apiKey" | "pwa" | "fcm" | null>(null)
 
@@ -177,6 +209,7 @@ export default function App() {
   const [rawApiKeyInput, setRawApiKeyInput] = useState("")
   const [cryptoStatus, setCryptoStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null)
   const [decryptedKeyPreview, setDecryptedKeyPreview] = useState<string | null>(null)
+  const [decryptedKeys, setDecryptedKeys] = useState<Record<string, string>>({})
 
   // PWA State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -241,16 +274,19 @@ export default function App() {
     }
   }, [darkMode])
 
-  // Load Encrypted API Key from IndexedDB
+  // Load Encrypted API Key from LocalStorage
   useEffect(() => {
-    getEncryptedApiKey()
+    setDecryptedKeyPreview(null)
+    setCryptoStatus(null)
+    setRawApiKeyInput("")
+    setPinInput("")
+
+    getEncryptedApiKey(apiProvider)
       .then((payload) => {
-        if (payload) {
-          setEncryptedPayload(payload)
-        }
+        setEncryptedPayload(payload)
       })
-      .catch((err) => console.error("Error loading key from IndexedDB:", err))
-  }, [])
+      .catch((err) => console.error("Error loading key from LocalStorage:", err))
+  }, [apiProvider])
 
   // PWA Prompt & Install Listener
   useEffect(() => {
@@ -335,11 +371,12 @@ export default function App() {
     try {
       setCryptoStatus({ type: "info", msg: "Encrypting with AES-GCM-256..." })
       const payload = await encryptApiKey(rawApiKeyInput.trim(), pinInput.trim())
-      await saveEncryptedApiKey(payload)
+      await saveEncryptedApiKey(apiProvider, payload)
       setEncryptedPayload(payload)
+      setDecryptedKeys(prev => ({ ...prev, [apiProvider.toLowerCase()]: rawApiKeyInput.trim() }))
       setRawApiKeyInput("")
       setPinInput("")
-      setCryptoStatus({ type: "success", msg: "API Key encrypted & stored in IndexedDB!" })
+      setCryptoStatus({ type: "success", msg: "API Key encrypted & stored in LocalStorage!" })
     } catch (err: any) {
       setCryptoStatus({ type: "error", msg: `Encryption failed: ${err.message || err}` })
     }
@@ -354,6 +391,7 @@ export default function App() {
     try {
       const decrypted = await decryptApiKey(encryptedPayload, pinInput.trim())
       setDecryptedKeyPreview(decrypted)
+      setDecryptedKeys(prev => ({ ...prev, [apiProvider.toLowerCase()]: decrypted }))
       setCryptoStatus({ type: "success", msg: "Decryption successful! Key valid." })
     } catch (err) {
       setDecryptedKeyPreview(null)
@@ -363,10 +401,15 @@ export default function App() {
 
   const handleRemoveApiKey = async () => {
     try {
-      await removeEncryptedApiKey()
+      await removeEncryptedApiKey(apiProvider)
       setEncryptedPayload(null)
       setDecryptedKeyPreview(null)
-      setCryptoStatus({ type: "info", msg: "Key removed from IndexedDB." })
+      setDecryptedKeys(prev => {
+        const next = { ...prev }
+        delete next[apiProvider.toLowerCase()]
+        return next
+      })
+      setCryptoStatus({ type: "info", msg: "Key removed from LocalStorage." })
     } catch (err: any) {
       setCryptoStatus({ type: "error", msg: `Failed to remove key: ${err.message}` })
     }
@@ -611,8 +654,12 @@ export default function App() {
             ) : isReviewing ? (
               <FlashcardReview
                 cards={reviewQueue}
+                settings={settings}
+                onUpdateSetting={handleUpdateSetting}
+                decryptedKeys={decryptedKeys}
+                setDecryptedKeys={setDecryptedKeys}
                 onClose={() => setIsReviewing(false)}
-                onReviewCard={(cardId, rating, reviewDuration) => {
+                onReviewCard={(cardId, rating, reviewDuration, aiEvaluation, userAnswer) => {
                   let cardToReview = null
                   for (const deck of decks) {
                     const card = deck.cards.find(c => c.id === cardId)
@@ -626,6 +673,8 @@ export default function App() {
 
                   const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
                   newHistoryEntry.reviewDuration = reviewDuration
+                  if (aiEvaluation) newHistoryEntry.aiEvaluation = aiEvaluation
+                  if (userAnswer) newHistoryEntry.userAnswer = userAnswer
 
                   saveReviewHistoryRecord(newHistoryEntry).catch(err => {
                     console.error("Failed to save review history to IndexedDB", err)
@@ -673,6 +722,7 @@ export default function App() {
         onUpdateSetting={handleUpdateSetting}
         onResetDefaults={handleResetSettings}
         onOpenDrawerStep={(step) => setActiveDrawerStep(step)}
+        onResetData={handleResetData}
       />
 
       {/* Closable Setup Drawer Modal */}

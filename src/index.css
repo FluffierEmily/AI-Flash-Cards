@@ -106,7 +106,37 @@
   transform: rotateY(180deg);
 }
 
+@keyframes gradient-shimmer {
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
 
+.animate-gradient-shimmer {
+  background: linear-gradient(90deg, hsl(var(--primary)) 0%, #a855f7 50%, hsl(var(--primary)) 100%) !important;
+  background-size: 200% 200% !important;
+  animation: gradient-shimmer 3s linear infinite !important;
+}
 
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-150%);
+  }
+  70% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(150%);
+  }
+}
 
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 1.5s infinite linear;
+}
 
+.shimmer-bar {
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+}

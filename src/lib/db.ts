@@ -3,7 +3,6 @@ import type { EncryptedPayload } from "./crypto"
 const DB_NAME = "ai_flash_cards_db"
 const DB_VERSION = 5
 const STORE_NAME = "settings"
-const API_KEY_RECORD_ID = "encrypted_gemini_api_key"
 
 export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -38,35 +37,39 @@ export function openDB(): Promise<IDBDatabase> {
   })
 }
 
-export async function saveEncryptedApiKey(payload: EncryptedPayload): Promise<void> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite")
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.put(payload, API_KEY_RECORD_ID)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+const KEYS_STORAGE_KEY = "encrypted_api_keys"
+
+export async function saveEncryptedApiKey(provider: string, payload: EncryptedPayload): Promise<void> {
+  if (typeof window === "undefined") return
+  const keysStr = localStorage.getItem(KEYS_STORAGE_KEY)
+  const keys = keysStr ? JSON.parse(keysStr) : {}
+  keys[provider.toLowerCase()] = payload
+  localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(keys))
 }
 
-export async function getEncryptedApiKey(): Promise<EncryptedPayload | null> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly")
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.get(API_KEY_RECORD_ID)
-    request.onsuccess = () => resolve(request.result || null)
-    request.onerror = () => reject(request.error)
-  })
+export async function getEncryptedApiKey(provider: string): Promise<EncryptedPayload | null> {
+  if (typeof window === "undefined") return null
+  const keysStr = localStorage.getItem(KEYS_STORAGE_KEY)
+  if (!keysStr) return null
+  try {
+    const keys = JSON.parse(keysStr)
+    return keys[provider.toLowerCase()] || null
+  } catch (e) {
+    console.error("Failed to parse encrypted API keys from localStorage", e)
+    return null
+  }
 }
 
-export async function removeEncryptedApiKey(): Promise<void> {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite")
-    const store = tx.objectStore(STORE_NAME)
-    const request = store.delete(API_KEY_RECORD_ID)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+export async function removeEncryptedApiKey(provider: string): Promise<void> {
+  if (typeof window === "undefined") return
+  const keysStr = localStorage.getItem(KEYS_STORAGE_KEY)
+  if (!keysStr) return
+  try {
+    const keys = JSON.parse(keysStr)
+    delete keys[provider.toLowerCase()]
+    localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(keys))
+  } catch (e) {
+    console.error("Failed to remove encrypted API key from localStorage", e)
+  }
 }
+

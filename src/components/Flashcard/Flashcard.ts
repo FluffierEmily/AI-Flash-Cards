@@ -1,3 +1,5 @@
+import type { EvalResult } from "../../lib/aiEvaluation"
+
 export type Difficulty = "easy" | "medium" | "hard"
 
 export type MasteryLevel = "weakness" | "slipUp" | "learning" | "proficient" | "mastered"
@@ -11,6 +13,8 @@ export type ReviewHistoryRecord = {
   interval: number
   masteryLevel: MasteryLevel
   reviewDuration?: number
+  aiEvaluation?: EvalResult
+  userAnswer?: string
 }
 
 export type Flashcard = {
