@@ -60,13 +60,81 @@ export function FlashcardReview({ cards = [], onReviewCard, onClose }: Flashcard
     totalReviews: 0
   })
 
-  const cardStartTimeRef = useRef<number>(Date.now())
+  const elapsedTimeRef = useRef<number>(0)
+  const lastActiveTimeRef = useRef<number>(Date.now())
+  const isTimerRunningRef = useRef<boolean>(true)
+
+  const pauseTimer = () => {
+    if (isTimerRunningRef.current) {
+      elapsedTimeRef.current += Date.now() - lastActiveTimeRef.current
+      isTimerRunningRef.current = false
+    }
+  }
+
+  const resumeTimer = () => {
+    if (!isTimerRunningRef.current && document.visibilityState === "visible") {
+      lastActiveTimeRef.current = Date.now()
+      isTimerRunningRef.current = true
+    }
+  }
+
+  const getDurationSec = (): number => {
+    let totalMs = elapsedTimeRef.current
+    if (isTimerRunningRef.current) {
+      totalMs += Date.now() - lastActiveTimeRef.current
+    }
+    return parseFloat((totalMs / 1000).toFixed(3))
+  }
 
   // Reset revealed hints and timer when card changes
   useEffect(() => {
     setRevealedHints({})
-    cardStartTimeRef.current = Date.now()
+    elapsedTimeRef.current = 0
+    lastActiveTimeRef.current = Date.now()
+    isTimerRunningRef.current = document.visibilityState === "visible"
   }, [activeCardIndex])
+
+  // Manage pause/resume on page visibility, focus, and blur events
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (!isEvaluating) {
+          resumeTimer()
+        }
+      } else {
+        pauseTimer()
+      }
+    }
+
+    const handleFocus = () => {
+      if (!isEvaluating) {
+        resumeTimer()
+      }
+    }
+
+    const handleBlur = () => {
+      pauseTimer()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleFocus)
+    window.addEventListener("blur", handleBlur)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleFocus)
+      window.removeEventListener("blur", handleBlur)
+    }
+  }, [isEvaluating])
+
+  // Pause timer during AI evaluation
+  useEffect(() => {
+    if (isEvaluating) {
+      pauseTimer()
+    } else {
+      resumeTimer()
+    }
+  }, [isEvaluating])
 
   const [cardHeight, setCardHeight] = useState<number | undefined>(undefined)
   const frontRef = useRef<HTMLDivElement>(null)
@@ -156,7 +224,7 @@ export function FlashcardReview({ cards = [], onReviewCard, onClose }: Flashcard
       [rating]: prev[rating] + 1,
       totalReviews: prev.totalReviews + 1
     }))
-    const durationSec = parseFloat(((Date.now() - cardStartTimeRef.current) / 1000).toFixed(3))
+    const durationSec = getDurationSec()
     onReviewCard(activeCard.id, rating, durationSec)
     setIsFlipped(false)
     setEvalResult(null)
