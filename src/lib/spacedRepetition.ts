@@ -279,7 +279,7 @@ export async function syncFcmReminders(
       const countAtTimestamp = M + futureDue.filter(c => new Date(c.nextReviewDate!).getTime() <= ts).length
       const response = await fcmCloudService.scheduleReminder(projectId, {
         fcmToken,
-        sendAtTimestamp: ts,
+        sendAtTimestamp: new Date(ts).toISOString(),
         title: "Study Flashcards! 📚",
         body: `You have ${countAtTimestamp} cards due for review. Keep up your learning streak!`
       }, useLocalEmulator)

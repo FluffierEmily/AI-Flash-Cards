@@ -92,7 +92,7 @@ exports.fcmRemindersQueue = onTaskDispatched({
 
     // In local emulator environment, simulate the delay if the scheduled time is in the future
     if (process.env.FUNCTIONS_EMULATOR === "true" && sendAtTimestamp) {
-        const delayMs = sendAtTimestamp - Date.now();
+        const delayMs = new Date(sendAtTimestamp).getTime() - Date.now();
         if (delayMs > 0) {
             // Cap at 60 seconds to prevent emulator function timeout
             const actualDelayMs = Math.min(delayMs, 60000);

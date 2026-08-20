@@ -304,7 +304,7 @@ export function useFcm() {
     if (!fcmToken || !projectId) {
       throw new Error("FCM not fully configured.")
     }
-    const sendAtTimestamp = Date.now() + 10 * 1000
+    const sendAtTimestamp = new Date(Date.now() + 10 * 1000).toISOString()
     const response = await fcmCloudService.scheduleReminder(projectId, {
       fcmToken,
       sendAtTimestamp,
@@ -318,7 +318,7 @@ export function useFcm() {
         taskId: response.taskId,
         title: "Scheduled Cloud Test ⏰",
         body: "Hello! This scheduled push notification has arrived after 10 seconds.",
-        sendAt: sendAtTimestamp,
+        sendAt: new Date(sendAtTimestamp).getTime(),
         useLocalEmulator: useLocalEmulator
       }
       

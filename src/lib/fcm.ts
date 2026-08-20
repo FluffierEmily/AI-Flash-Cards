@@ -11,7 +11,7 @@ export type SendPushNotificationResponse = {
 
 export type ScheduleReminderPayload = {
   fcmToken: string;
-  sendAtTimestamp: number;
+  sendAtTimestamp: string;
   title: string;
   body: string;
 };
