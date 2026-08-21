@@ -1,6 +1,6 @@
 import { Settings, X, Lock, Unlock, AlertCircle } from "lucide-react"
-import { PROVIDER_MODELS } from "../../lib/ai"
-import type { SettingsState } from "../Settings"
+import { PROVIDER_MODELS } from "../lib/ai"
+import type { SettingsState } from "./Settings"
 
 export interface ModelSelectorModalProps {
   isOpen: boolean

@@ -23,7 +23,7 @@ import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "../../lib/crypto"
 import { getEncryptedApiKey, saveEncryptedApiKey } from "../../lib/db"
-import { ModelSelectorModal } from "./ModelSelectorModal"
+import { ModelSelectorModal } from "../ModelSelectorModal"
 
 export const SAMPLE_CARDS: Flashcard[] = [
   {
@@ -552,10 +552,10 @@ export function FlashcardReview({
               <button
                 onClick={triggerAIEvaluation}
                 className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 relative overflow-hidden ${isEvaluating
-                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                    : !userAnswer.replace(/<[^>]*>/g, "").trim()
-                      ? "bg-primary opacity-40 pointer-events-none"
-                      : "bg-primary cursor-pointer"
+                  ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                  : !userAnswer.replace(/<[^>]*>/g, "").trim()
+                    ? "bg-primary opacity-40 pointer-events-none"
+                    : "bg-primary cursor-pointer"
                   }`}
               >
                 {isEvaluating && (
