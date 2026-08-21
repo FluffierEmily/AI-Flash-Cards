@@ -8,6 +8,8 @@ export interface EvalResult {
   correctParts: string[]
   missingParts: string[]
   wrongParts: string[]
+  provider?: string
+  modelName?: string
 }
 
 export const EVAL_SCHEMA = z.object({
@@ -42,7 +44,7 @@ export function formatPrompt(template: string, question: string, referenceAnswer
   } else {
     // Append standard context
     prompt = `${prompt}
-
+ 
 Question: ${question}
 Reference Answer: ${referenceAnswer}
 Student's Answer: ${userAnswer}`
@@ -56,7 +58,9 @@ export async function evaluateAnswer(
   referenceAnswer: string,
   userAnswer: string,
   promptTemplate: string,
-  model: any
+  model: any,
+  provider?: string,
+  modelName?: string
 ): Promise<EvalResult> {
   const prompt = formatPrompt(promptTemplate, question, referenceAnswer, userAnswer)
   
@@ -67,5 +71,9 @@ export async function evaluateAnswer(
     system: "You evaluate student answers for flashcards and output structured JSON feedback.",
   })
   
-  return response.object
+  return {
+    ...response.object,
+    provider,
+    modelName
+  }
 }

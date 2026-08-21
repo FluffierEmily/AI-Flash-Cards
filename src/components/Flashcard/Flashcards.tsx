@@ -14,16 +14,16 @@ import {
   Check,
   AlertCircle,
   X,
-  Lock,
-  Unlock
+  Lock
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
 import type { SettingsState } from "../Settings"
-import { getModelInstance, PROVIDER_MODELS } from "../../lib/ai"
+import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "../../lib/crypto"
 import { getEncryptedApiKey, saveEncryptedApiKey } from "../../lib/db"
+import { ModelSelectorModal } from "./ModelSelectorModal"
 
 export const SAMPLE_CARDS: Flashcard[] = [
   {
@@ -78,7 +78,6 @@ export interface FlashcardReviewProps {
 export function FlashcardReview({
   cards = [],
   settings,
-  onUpdateSetting,
   decryptedKeys,
   setDecryptedKeys,
   onReviewCard,
@@ -114,6 +113,15 @@ export function FlashcardReview({
 
 
   // Modals state
+  let [aiEvaluationProvider, setAiEvaluationProvider] = useState(() => localStorage.getItem("ai_evaluation_provider") || "")
+  let [aiEvaluationModel, setAiEvaluationModel] = useState(() => localStorage.getItem("ai_evaluation_model") || "")
+
+  const rawOverrideProvider = aiEvaluationProvider
+  const rawOverrideModel = aiEvaluationModel
+
+  aiEvaluationProvider ||= settings.aiModelProvider
+  aiEvaluationModel ||= settings.aiModelName
+
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [pinModalProvider, setPinModalProvider] = useState("")
@@ -314,17 +322,17 @@ export function FlashcardReview({
     setIsEvaluating(true)
     setPinStatus(null)
     try {
-      const provider = settings.aiModelProvider || "Google"
-      const modelName = settings.aiModelName || "gemini-1.5-flash"
       const promptTemplate = settings.aiEvalPrompt
 
-      const model = getModelInstance(provider, modelName, apiKey)
+      const model = getModelInstance(aiEvaluationProvider, aiEvaluationModel, apiKey)
       const result = await evaluateAnswer(
         activeCard.question,
         activeCard.answer,
         userAnswer.replace(/<[^>]*>/g, "").trim(),
         promptTemplate,
-        model
+        model,
+        aiEvaluationProvider,
+        aiEvaluationModel
       )
 
       setEvalResult(result)
@@ -342,7 +350,7 @@ export function FlashcardReview({
     const cleanUserAnswer = userAnswer.replace(/<[^>]*>/g, "").trim()
     if (!cleanUserAnswer) return
 
-    const provider = settings.aiModelProvider || "Google"
+    const provider = aiEvaluationProvider
 
     // Check if we have the key decrypted in memory
     const existingKey = decryptedKeys[provider.toLowerCase()]
@@ -470,7 +478,7 @@ export function FlashcardReview({
                 type="button"
                 onClick={() => setIsModelSelectorOpen(true)}
                 className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title={`AI Model: ${settings.aiModelProvider} - ${settings.aiModelName}`}
+                title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
               >
                 <Settings className="h-4.5 w-4.5" />
               </button>
@@ -543,13 +551,12 @@ export function FlashcardReview({
             <div className="flex gap-3">
               <button
                 onClick={triggerAIEvaluation}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 relative overflow-hidden ${
-                  isEvaluating
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 relative overflow-hidden ${isEvaluating
                     ? "pointer-events-none opacity-100 animate-gradient-shimmer"
                     : !userAnswer.replace(/<[^>]*>/g, "").trim()
                       ? "bg-primary opacity-40 pointer-events-none"
                       : "bg-primary cursor-pointer"
-                }`}
+                  }`}
               >
                 {isEvaluating && (
                   <div
@@ -575,6 +582,16 @@ export function FlashcardReview({
                   )}
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIsModelSelectorOpen(true)}
+                className="flex items-center justify-center rounded-xl border border-border px-3.5 h-12 text-muted-foreground hover:text-foreground hover:bg-accent hover:border-accent-foreground/30 transition-all duration-200 cursor-pointer shrink-0"
+                title={`Configure AI Model for Evaluation (Current: ${aiEvaluationProvider} - ${aiEvaluationModel})`}
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+
               <button
                 onClick={() => setIsFlipped(true)}
                 className="flex items-center justify-center gap-2 rounded-xl border border-border px-5 h-12 font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-98 shadow-sm cursor-pointer"
@@ -618,7 +635,7 @@ export function FlashcardReview({
                 type="button"
                 onClick={() => setIsModelSelectorOpen(true)}
                 className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title={`AI Model: ${settings.aiModelProvider} - ${settings.aiModelName}`}
+                title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
               >
                 <Settings className="h-4.5 w-4.5" />
               </button>
@@ -807,101 +824,28 @@ export function FlashcardReview({
         </div>
       </div>
 
-      {/* Model Selector Modal */}
-      {isModelSelectorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            onClick={() => setIsModelSelectorOpen(false)}
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm cursor-pointer"
-          />
-          <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-2xl shadow-xl overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in duration-200 text-left">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
-                <Settings className="h-5 w-5 text-primary" />
-                AI Model Settings
-              </h3>
-              <button
-                onClick={() => setIsModelSelectorOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Provider</label>
-                <select
-                  value={settings.aiModelProvider}
-                  onChange={(e) => {
-                    const provider = e.target.value
-                    onUpdateSetting("aiModelProvider", provider)
-                    onUpdateSetting("aiModelName", PROVIDER_MODELS[provider]?.[0] || "")
-                  }}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm cursor-pointer outline-none focus:border-primary"
-                >
-                  {Object.keys(PROVIDER_MODELS).map((provider) => (
-                    <option key={provider} value={provider}>
-                      {provider}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Model</label>
-                <select
-                  value={settings.aiModelName}
-                  onChange={(e) => onUpdateSetting("aiModelName", e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm cursor-pointer outline-none focus:border-primary"
-                >
-                  {(PROVIDER_MODELS[settings.aiModelProvider] || []).map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {settings.aiModelProvider === "Anthropic" && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl text-xs space-y-1">
-                  <div className="font-semibold flex items-center gap-1">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Note on Anthropic CORS
-                  </div>
-                  <p className="leading-relaxed">
-                    Direct browser requests to Anthropic block due to CORS policy. Consider using Google, OpenAI, or
-                    OpenRouter to run Claude models.
-                  </p>
-                </div>
-              )}
-
-              <div className="p-3 bg-secondary/50 rounded-xl text-xs space-y-1">
-                <div className="text-muted-foreground">
-                  Current Key Status for <span className="font-semibold text-foreground">{settings.aiModelProvider}</span>:
-                </div>
-                <div className="font-semibold text-foreground flex items-center gap-1.5 mt-1">
-                  {decryptedKeys[settings.aiModelProvider.toLowerCase()] ? (
-                    <span className="text-emerald-500 flex items-center gap-1">
-                      <Unlock className="h-3.5 w-3.5" /> Decrypted & In Memory
-                    </span>
-                  ) : (
-                    <span className="text-amber-500 flex items-center gap-1">
-                      <Lock className="h-3.5 w-3.5" /> Encrypted / Not set
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setIsModelSelectorOpen(false)}
-              className="w-full h-10 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity cursor-pointer mt-2"
-            >
-              Apply Settings
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Model Selector Modal Component */}
+      <ModelSelectorModal
+        isOpen={isModelSelectorOpen}
+        onClose={() => setIsModelSelectorOpen(false)}
+        settings={settings}
+        aiEvaluationProvider={rawOverrideProvider}
+        aiEvaluationModel={rawOverrideModel}
+        onUpdateOverride={(provider, model) => {
+          if (provider === "") {
+            localStorage.removeItem("ai_evaluation_provider")
+            localStorage.removeItem("ai_evaluation_model")
+            setAiEvaluationProvider("")
+            setAiEvaluationModel("")
+          } else {
+            localStorage.setItem("ai_evaluation_provider", provider)
+            localStorage.setItem("ai_evaluation_model", model)
+            setAiEvaluationProvider(provider)
+            setAiEvaluationModel(model)
+          }
+        }}
+        decryptedKeys={decryptedKeys}
+      />
 
       {/* PIN Decrypt / BYOK Modal */}
       {isPinModalOpen && (

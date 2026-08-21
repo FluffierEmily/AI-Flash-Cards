@@ -3,7 +3,14 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 
 export const PROVIDER_MODELS: Record<string, string[]> = {
-  Google: ["gemini-3.6-flash", "gemini-3.6-pro", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-pro"],
+  Google: [
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
+  ],
   OpenAI: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
   Anthropic: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"],
   OpenRouter: [
@@ -24,14 +31,7 @@ export function getModelInstance(provider: string, modelName: string, apiKey: st
       const google = createGoogleGenerativeAI({
         apiKey,
       })
-      let resolvedModel = modelName || "gemini-3.6-flash"
-      if (
-        resolvedModel === "gemini-1.5-flash" ||
-        resolvedModel === "gemini-2.0-flash" ||
-        resolvedModel === "gemini-2.5-flash"
-      ) {
-        resolvedModel = "gemini-3.6-flash"
-      }
+      const resolvedModel = modelName || "gemini-3.7-flash"
       return google(resolvedModel)
     }
     case "openai": {

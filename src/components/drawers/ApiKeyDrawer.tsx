@@ -1,6 +1,8 @@
 import React from "react"
-import { ShieldCheck, Cpu, ChevronDown, Lock, Key, AlertCircle, Check, Unlock, Trash2 } from "lucide-react"
+import { ShieldCheck, ChevronDown, Lock, Key, AlertCircle, Check, Unlock, Trash2, Sparkles } from "lucide-react"
 import type { EncryptedPayload } from "../../lib/crypto"
+import { PROVIDER_MODELS } from "../../lib/ai"
+import type { SettingsState } from "../Settings"
 
 function DatabaseIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -36,6 +38,8 @@ export interface ApiKeyDrawerProps {
   handleSaveApiKey: () => void
   handleDecryptApiKey: () => void
   handleRemoveApiKey: () => void
+  settings: SettingsState
+  onUpdateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
 }
 
 export const getApiKeyPlaceholder = (provider: string) => {
@@ -71,10 +75,66 @@ export function ApiKeyDrawer({
   decryptedKeyPreview,
   handleSaveApiKey,
   handleDecryptApiKey,
-  handleRemoveApiKey
+  handleRemoveApiKey,
+  settings,
+  onUpdateSetting
 }: ApiKeyDrawerProps) {
   return (
     <div className="p-6 space-y-6">
+      {/* Default AI Model Settings Card */}
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+          <Sparkles className="h-4 w-4" />
+          Default AI Model
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-[11px] font-semibold text-foreground">
+              Provider
+            </label>
+            <div className="relative">
+              <select
+                value={settings.aiModelProvider}
+                onChange={(e) => {
+                  const val = e.target.value
+                  onUpdateSetting("aiModelProvider", val)
+                  setApiProvider(val)
+                  onUpdateSetting("aiModelName", PROVIDER_MODELS[val]?.[0] || "")
+                }}
+                className="w-full h-9 px-2.5 rounded-xl border border-border bg-background text-[11px] text-foreground outline-none focus:border-primary appearance-none cursor-pointer pr-7"
+              >
+                {Object.keys(PROVIDER_MODELS).map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-semibold text-foreground">
+              Model
+            </label>
+            <div className="relative">
+              <select
+                value={settings.aiModelName}
+                onChange={(e) => onUpdateSetting("aiModelName", e.target.value)}
+                className="w-full h-9 px-2.5 rounded-xl border border-border bg-background text-[11px] text-foreground outline-none focus:border-primary appearance-none cursor-pointer pr-7"
+              >
+                {(PROVIDER_MODELS[settings.aiModelProvider] || []).map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="h-3 w-3 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2 text-xs leading-relaxed text-muted-foreground">
         <div className="flex items-center gap-2 text-primary font-semibold text-sm">
           <ShieldCheck className="h-4 w-4" />
@@ -90,28 +150,6 @@ export function ApiKeyDrawer({
 
       {/* Form */}
       <div className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-            <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-            API Provider
-          </label>
-          <div className="relative">
-            <select
-              value={apiProvider}
-              onChange={(e) => setApiProvider(e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer pr-10"
-            >
-              <option value="Google">Google (Gemini)</option>
-              <option value="OpenAI">OpenAI (ChatGPT)</option>
-              <option value="Anthropic">Anthropic (Claude)</option>
-              <option value="OpenRouter">OpenRouter</option>
-              <option value="Groq">Groq</option>
-              <option value="DeepSeek">DeepSeek</option>
-              <option value="Mistral">Mistral AI</option>
-            </select>
-            <ChevronDown className="h-4 w-4 text-muted-foreground absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-        </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground flex items-center gap-1">
@@ -156,8 +194,20 @@ export function ApiKeyDrawer({
           className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-sm cursor-pointer"
         >
           <Lock className="h-4 w-4" />
-          Encrypt & Save to IndexedDB
+          Encrypt & Save
         </button>
+
+        {encryptedPayload && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleDecryptApiKey}
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-xs font-semibold hover:bg-accent transition-colors cursor-pointer"
+            >
+              <Unlock className="h-3.5 w-3.5" />
+              Decrypt with PIN
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stored Key verification section */}
@@ -166,21 +216,8 @@ export function ApiKeyDrawer({
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
               <DatabaseIcon className="h-4 w-4 text-emerald-500" />
-              Stored Key Record Status
+              Found Key Stored in IndexedDB
             </span>
-            <span className="text-[11px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full font-medium">
-              Active in IndexedDB
-            </span>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleDecryptApiKey}
-              className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card text-xs font-semibold hover:bg-accent transition-colors cursor-pointer"
-            >
-              <Unlock className="h-3.5 w-3.5" />
-              Verify / Decrypt PIN
-            </button>
             <button
               onClick={handleRemoveApiKey}
               className="h-10 px-3 flex items-center justify-center text-rose-500 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
@@ -189,6 +226,9 @@ export function ApiKeyDrawer({
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
+
+
+
 
           {decryptedKeyPreview && (
             <div className="p-3 rounded-xl border border-border bg-secondary/50 text-xs space-y-1">

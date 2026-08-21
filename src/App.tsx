@@ -741,7 +741,9 @@ export default function App() {
           decryptedKeyPreview,
           handleSaveApiKey,
           handleDecryptApiKey,
-          handleRemoveApiKey
+          handleRemoveApiKey,
+          settings,
+          onUpdateSetting: handleUpdateSetting
         }}
         pwaProps={{
           isPwaInstalled,
