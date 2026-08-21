@@ -225,3 +225,7 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [x] Add the AI evaluation layer (LLM scoring endpoint).
 - [x] Setup Firebase Cloud Messaging for PWA background push notifications.
 - [ ] Design statistics and progress tracking dashboards.
+- [ ] AI deck builder
+- [ ] AI hint generator
+- [ ] improve spaced repetition algorithm (consider review duration)
+- [ ] EXP progression system (increases deck capacity and max deck count)
