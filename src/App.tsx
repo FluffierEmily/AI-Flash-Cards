@@ -650,6 +650,9 @@ export default function App() {
                   setEditingDeckId(null)
                 }}
                 onDeleteDeck={handleDeleteDeck}
+                settings={settings}
+                decryptedKeys={decryptedKeys}
+                setDecryptedKeys={setDecryptedKeys}
               />
             ) : isReviewing ? (
               <FlashcardReview

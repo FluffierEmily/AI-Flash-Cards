@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 
 import { DEFAULT_EVAL_PROMPT } from "../lib/aiEvaluation"
+import { DEFAULT_HINT_PROMPT } from "../lib/aiHints"
 
 export interface SettingsState {
   cardShuffle: boolean
@@ -32,6 +33,7 @@ export interface SettingsState {
   aiEvalPrompt: string
   aiModelProvider: string
   aiModelName: string
+  aiHintPrompt: string
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
@@ -49,7 +51,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   darkMode: true,
   aiEvalPrompt: DEFAULT_EVAL_PROMPT,
   aiModelProvider: "Google",
-  aiModelName: "gemini-3.6-flash"
+  aiModelName: "gemini-3.6-flash",
+  aiHintPrompt: DEFAULT_HINT_PROMPT
 }
 
 export interface SettingsModalProps {
@@ -443,6 +446,25 @@ export function SettingsModal({
               onChange={(e) => onUpdateSetting("aiEvalPrompt", e.target.value)}
               className="w-full p-3 rounded-xl border border-input bg-card text-foreground font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y leading-relaxed"
               placeholder="Enter custom AI evaluation instructions..."
+            />
+          </div>
+
+          {/* AI Hint Prompt Section */}
+          <div className="py-4 space-y-3 border-t border-border/40">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
+              <label className="text-sm font-semibold text-foreground cursor-pointer" htmlFor="input-ai-hint-prompt">
+                AI Hint Generation Prompt
+              </label>
+              <SettingTooltip text="Customize the guidelines used by the AI to generate hints. Use {question}, {answer}, and {count} placeholder tags to inject flashcard context." />
+            </div>
+            <textarea
+              id="input-ai-hint-prompt"
+              rows={6}
+              value={settings.aiHintPrompt}
+              onChange={(e) => onUpdateSetting("aiHintPrompt", e.target.value)}
+              className="w-full p-3 rounded-xl border border-input bg-card text-foreground font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y leading-relaxed"
+              placeholder="Enter custom AI hint generation instructions..."
             />
           </div>
 

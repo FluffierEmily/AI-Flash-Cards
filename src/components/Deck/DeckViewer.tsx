@@ -4,6 +4,7 @@ import type { Deck } from "./Deck"
 import { AddFlashcardModal } from "../Flashcard/AddFlashcardModal"
 import { EditFlashcardModal } from "../Flashcard/EditFlashcardModal"
 import type { Flashcard } from "../Flashcard/Flashcard"
+import type { SettingsState } from "../Settings"
 
 interface DeckViewerProps {
   currentDeck: Deck
@@ -14,6 +15,9 @@ interface DeckViewerProps {
   onStartReviewDeck?: (deckId: string) => void
   dueCount?: number
   onDeleteDeck: (deckId: string) => void
+  settings: SettingsState
+  decryptedKeys: Record<string, string>
+  setDecryptedKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>
 }
 
 export function DeckViewer({
@@ -25,6 +29,9 @@ export function DeckViewer({
   onStartReviewDeck,
   dueCount,
   onDeleteDeck,
+  settings,
+  decryptedKeys,
+  setDecryptedKeys,
 }: DeckViewerProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -271,6 +278,9 @@ export function DeckViewer({
         onClose={() => setIsAddModalOpen(false)}
         onAddCard={(newCard) => onAddCard(currentDeck.id, newCard)}
         deckId={currentDeck.id}
+        settings={settings}
+        decryptedKeys={decryptedKeys}
+        setDecryptedKeys={setDecryptedKeys}
       />
 
       {/* Edit Flashcard Modal */}
@@ -279,6 +289,9 @@ export function DeckViewer({
         onClose={() => setSelectedCardForEdit(null)}
         card={selectedCardForEdit ? currentDeck.cards.find(c => c.id === selectedCardForEdit.id) || null : null}
         onUpdateCard={handleUpdateCard}
+        settings={settings}
+        decryptedKeys={decryptedKeys}
+        setDecryptedKeys={setDecryptedKeys}
       />
 
       {/* Delete Deck Confirmation Modal */}

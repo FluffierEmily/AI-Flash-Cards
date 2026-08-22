@@ -6,8 +6,8 @@ export interface ModelSelectorModalProps {
   isOpen: boolean
   onClose: () => void
   settings: SettingsState
-  aiEvaluationProvider: string // raw value from state (could be "")
-  aiEvaluationModel: string // raw value from state (could be "")
+  overrideProvider: string // raw value from state (could be "")
+  overrideModel: string // raw value from state (could be "")
   onUpdateOverride: (provider: string, model: string) => void
   decryptedKeys: Record<string, string>
 }
@@ -16,19 +16,19 @@ export function ModelSelectorModal({
   isOpen,
   onClose,
   settings,
-  aiEvaluationProvider,
-  aiEvaluationModel,
+  overrideProvider,
+  overrideModel,
   onUpdateOverride,
   decryptedKeys
 }: ModelSelectorModalProps) {
   if (!isOpen) return null
 
   // Compute active resolved provider for status display
-  const activeProvider = aiEvaluationProvider || settings.aiModelProvider
-  const isUsingDefault = !aiEvaluationProvider
+  const activeProvider = overrideProvider || settings.aiModelProvider
+  const isUsingDefault = !overrideProvider
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       {/* Backdrop Overlay with Blur */}
       <div
         onClick={onClose}
@@ -40,7 +40,7 @@ export function ModelSelectorModal({
         <div className="flex items-center justify-between border-b border-border/60 pb-3">
           <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
             <Settings className="h-5 w-5 text-primary" />
-            AI Evaluation Model
+            AI Model Selection
           </h3>
           <button
             onClick={onClose}
@@ -54,7 +54,7 @@ export function ModelSelectorModal({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground">Provider</label>
             <select
-              value={aiEvaluationProvider}
+              value={overrideProvider}
               onChange={(e) => {
                 const val = e.target.value
                 if (val === "") {
@@ -77,10 +77,10 @@ export function ModelSelectorModal({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground">Model</label>
             <select
-              value={isUsingDefault ? "" : aiEvaluationModel}
+              value={isUsingDefault ? "" : overrideModel}
               onChange={(e) => {
                 if (!isUsingDefault) {
-                  onUpdateOverride(aiEvaluationProvider, e.target.value)
+                  onUpdateOverride(overrideProvider, e.target.value)
                 }
               }}
               disabled={isUsingDefault}
@@ -89,7 +89,7 @@ export function ModelSelectorModal({
               {isUsingDefault ? (
                 <option value="">Use Global Default ({settings.aiModelName})</option>
               ) : (
-                (PROVIDER_MODELS[aiEvaluationProvider] || []).map((model) => (
+                (PROVIDER_MODELS[overrideProvider] || []).map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>

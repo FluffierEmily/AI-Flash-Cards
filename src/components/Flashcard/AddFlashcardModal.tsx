@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from "react"
-import { Plus, X, Check, GripVertical, Trash2 } from "lucide-react"
+import { Plus, X, Check, GripVertical, Trash2, Sparkles, Settings as SettingsIcon, RefreshCw } from "lucide-react"
 import type { Flashcard, Difficulty } from "./Flashcard"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import { loadDecks, saveDecks } from "../../lib/deckStorage"
+import { ModelSelectorModal } from "../ModelSelectorModal"
+import { PinDecryptModal } from "../PinDecryptModal"
+import type { SettingsState } from "../Settings"
+import { getModelInstance } from "../../lib/ai"
+import { generateHints } from "../../lib/aiHints"
 
 interface AddFlashcardModalProps {
   isOpen: boolean
   onClose: () => void
   onAddCard: (card: Flashcard) => void
   deckId: string
+  settings: SettingsState
+  decryptedKeys: Record<string, string>
+  setDecryptedKeys: React.Dispatch<React.SetStateAction<Record<string, string>>>
 }
 
 export function AddFlashcardModal({
@@ -16,6 +24,9 @@ export function AddFlashcardModal({
   onClose,
   onAddCard,
   deckId,
+  settings,
+  decryptedKeys,
+  setDecryptedKeys
 }: AddFlashcardModalProps) {
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
@@ -25,6 +36,15 @@ export function AddFlashcardModal({
   const [newHint, setNewHint] = useState("")
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  const [isGeneratingHints, setIsGeneratingHints] = useState(false)
+  const [hintProgress, setHintProgress] = useState(0)
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false)
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false)
+  const [pinModalProvider, setPinModalProvider] = useState("")
+
+  let [hintProvider, setHintProvider] = useState(() => localStorage.getItem("ai_hint_provider") || "")
+  let [hintModel, setHintModel] = useState(() => localStorage.getItem("ai_hint_model") || "")
 
   // Reset form state when modal closes or opens
   useEffect(() => {
@@ -37,8 +57,64 @@ export function AddFlashcardModal({
       setNewHint("")
       setDraggedIndex(null)
       setDragOverIndex(null)
+      setIsGeneratingHints(false)
+      setHintProgress(0)
+      setIsModelSelectorOpen(false)
+      setIsPinModalOpen(false)
     }
   }, [isOpen])
+
+  useEffect(() => {
+    let intervalId: any
+    if (isGeneratingHints) {
+      setHintProgress(0)
+      intervalId = setInterval(() => {
+        setHintProgress((prev) => {
+          const remaining = 100 - prev
+          const step = remaining * 0.08
+          return Math.min(prev + step, 99.9)
+        })
+      }, 100)
+    } else {
+      setHintProgress(0)
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [isGeneratingHints])
+
+  const runRealHintGeneration = async (apiKey: string) => {
+    setIsGeneratingHints(true)
+    const provider = hintProvider || settings.aiModelProvider
+    const modelName = hintModel || settings.aiModelName
+    const count = 3 - hints.length
+
+    try {
+      const model = getModelInstance(provider, modelName, apiKey)
+      const generated = await generateHints(question, answer, count, model, settings.aiHintPrompt)
+      setHints((prev) => [...prev, ...generated.slice(0, count)])
+    } catch (err: any) {
+      console.error("AI Hint Generation failed:", err)
+      alert(`AI Hint Generation failed: ${err.message || err}`)
+    } finally {
+      setIsGeneratingHints(false)
+    }
+  }
+
+  const triggerHintGeneration = async () => {
+    const count = 3 - hints.length
+    if (count <= 0 || !question.trim() || !answer.trim()) return
+
+    const provider = hintProvider || settings.aiModelProvider
+
+    const existingKey = decryptedKeys[provider.toLowerCase()]
+    if (existingKey) {
+      await runRealHintGeneration(existingKey)
+    } else {
+      setPinModalProvider(provider)
+      setIsPinModalOpen(true)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -184,9 +260,67 @@ export function AddFlashcardModal({
 
           {/* Hints Section */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground mb-1.5 block">
-              Hints (Drag to reorder)
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Hints (Drag to reorder)
+              </label>
+              
+              <div className="flex items-center gap-2">
+                {/* Generate Hints Button with Shimmer Progress */}
+                <button
+                  type="button"
+                  onClick={triggerHintGeneration}
+                  disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || !answer.trim()}
+                  className={`relative overflow-hidden flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-200 active:scale-95 shadow-sm ${
+                    isGeneratingHints
+                      ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                      : hints.length >= 3 || !question.trim() || !answer.trim()
+                        ? "bg-primary opacity-40 pointer-events-none"
+                        : "bg-primary cursor-pointer hover:opacity-95"
+                  }`}
+                  title={
+                    !question.trim() || !answer.trim()
+                      ? "Enter question and answer to generate hints"
+                      : hints.length >= 3
+                        ? "Max 3 hints reached"
+                        : `Generate ${3 - hints.length} hint(s) automatically`
+                  }
+                >
+                  {isGeneratingHints && (
+                    <div
+                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-violet-200/10 to-violet-200/65 transition-all duration-100 ease-out pointer-events-none overflow-hidden"
+                      style={{ width: `${hintProgress}%` }}
+                    >
+                      <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
+                      <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-violet-200 shadow-[0_0_8px_#e9d5ff]" />
+                    </div>
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    {isGeneratingHints ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        Generating ({Math.round(hintProgress)}%)...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Generate {3 - hints.length} Hint{3 - hints.length > 1 ? "s" : ""}
+                      </>
+                    )}
+                  </span>
+                </button>
+
+                {/* Settings gear icon for overrides */}
+                <button
+                  type="button"
+                  onClick={() => setIsModelSelectorOpen(true)}
+                  className="p-1.5 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-all cursor-pointer"
+                  title={`Configure AI Model for Hints (Current: ${hintProvider || settings.aiModelProvider} - ${hintModel || settings.aiModelName})`}
+                >
+                  <SettingsIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
 
             {/* List of current hints */}
             {hints.length > 0 && (
@@ -305,6 +439,40 @@ export function AddFlashcardModal({
           </div>
         </form>
       </div>
+
+      {/* AI Model Selector for Hints */}
+      <ModelSelectorModal
+        isOpen={isModelSelectorOpen}
+        onClose={() => setIsModelSelectorOpen(false)}
+        settings={settings}
+        overrideProvider={hintProvider}
+        overrideModel={hintModel}
+        onUpdateOverride={(provider, model) => {
+          if (provider === "") {
+            localStorage.removeItem("ai_hint_provider")
+            localStorage.removeItem("ai_hint_model")
+            setHintProvider("")
+            setHintModel("")
+          } else {
+            localStorage.setItem("ai_hint_provider", provider)
+            localStorage.setItem("ai_hint_model", model)
+            setHintProvider(provider)
+            setHintModel(model)
+          }
+        }}
+        decryptedKeys={decryptedKeys}
+      />
+
+      {/* PIN Decrypt / BYOK Modal */}
+      <PinDecryptModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        provider={pinModalProvider}
+        onKeySuccess={(apiKey) => {
+          runRealHintGeneration(apiKey)
+        }}
+        setDecryptedKeys={setDecryptedKeys}
+      />
     </div>
   )
 }
