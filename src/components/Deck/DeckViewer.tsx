@@ -1,10 +1,13 @@
-import { useState } from "react"
-import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, RefreshCw } from "lucide-react"
 import type { Deck } from "./Deck"
 import { AddFlashcardModal } from "../Flashcard/AddFlashcardModal"
 import { EditFlashcardModal } from "../Flashcard/EditFlashcardModal"
 import type { Flashcard } from "../Flashcard/Flashcard"
 import type { SettingsState } from "../Settings"
+import { generateCards } from "../../lib/aiCardGenerator"
+import { getModelInstance } from "../../lib/ai"
+import { PinDecryptModal } from "../PinDecryptModal"
 
 interface DeckViewerProps {
   currentDeck: Deck
@@ -39,6 +42,102 @@ export function DeckViewer({
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [selectedCardForEdit, setSelectedCardForEdit] = useState<Flashcard | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const [isGeneratingCards, setIsGeneratingCards] = useState(false)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+  const [customInstructions, setCustomInstructions] = useState("")
+  const [includeExistingAsContext, setIncludeExistingAsContext] = useState(true)
+  const [shouldGenerateHints, setShouldGenerateHints] = useState(true)
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false)
+  const [pinModalProvider, setPinModalProvider] = useState("")
+  const [preferredDifficulty, setPreferredDifficulty] = useState("")
+  const [preferredLabel, setPreferredLabel] = useState("")
+  const [generationProgress, setGenerationProgress] = useState(0)
+
+  const isGenerationDisabled = isGeneratingCards || currentDeck.title.toLowerCase().includes("deck")
+
+  useEffect(() => {
+    let intervalId: any
+    if (isGeneratingCards) {
+      setGenerationProgress(0)
+      intervalId = setInterval(() => {
+        setGenerationProgress((prev) => {
+          const remaining = 100 - prev
+          const step = remaining * 0.05
+          return Math.min(prev + step, 99.9)
+        })
+      }, 200)
+    } else {
+      setGenerationProgress(0)
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [isGeneratingCards])
+
+  const triggerCardGenerationFlow = () => {
+    if (isGenerationDisabled) return
+    setIsConfirmModalOpen(true)
+  }
+
+  const handleConfirmGeneration = () => {
+    setIsConfirmModalOpen(false)
+    const provider = settings.aiModelProvider
+    const existingKey = decryptedKeys[provider.toLowerCase()]
+
+    if (existingKey) {
+      runRealCardGeneration(existingKey, shouldGenerateHints)
+    } else {
+      setPinModalProvider(provider)
+      setIsPinModalOpen(true)
+    }
+  }
+
+  const runRealCardGeneration = async (apiKey: string, genHints: boolean) => {
+    setIsGeneratingCards(true)
+    try {
+      const provider = settings.aiModelProvider
+      const modelName = settings.aiModelName
+      const model = getModelInstance(provider, modelName, apiKey)
+
+      const existingContext = includeExistingAsContext ? currentDeck.cards : []
+
+      const newCards = await generateCards(
+        currentDeck.title,
+        currentDeck.description || "",
+        existingContext,
+        genHints,
+        model,
+        customInstructions,
+        settings.aiHintPrompt,
+        preferredDifficulty || undefined,
+        preferredLabel || undefined
+      )
+
+      const processedCards = newCards.map((cardData: any, idx: number) => ({
+        id: (Date.now() + idx).toString(),
+        deckId: currentDeck.id,
+        question: cardData.question.replace(/<[^>]*>/g, "").trim(),
+        answer: cardData.answer,
+        label: cardData.label || "",
+        difficulty: cardData.difficulty || "medium",
+        hints: cardData.hints,
+      }))
+
+      const updatedCards = [...currentDeck.cards, ...processedCards]
+      onUpdateDeck(currentDeck.id, { cards: updatedCards })
+
+      setCustomInstructions("")
+      // Reset difficulty and label preferences on successful generation
+      setPreferredDifficulty("")
+      setPreferredLabel("")
+    } catch (err: any) {
+      console.error("AI Card Generation failed:", err)
+      alert(`AI Card Generation failed: ${err.message || err}`)
+    } finally {
+      setIsGeneratingCards(false)
+    }
+  }
 
   const handleUpdateCard = (updatedCard: Flashcard) => {
     const updatedCards = currentDeck.cards.map((c) =>
@@ -208,13 +307,49 @@ export function DeckViewer({
             <p className="text-sm font-medium text-muted-foreground">
               No flashcards in this deck yet.
             </p>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="relative group border border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-primary/5 cursor-pointer active:scale-95 text-muted-foreground hover:text-primary"
-              title="Add Flashcard"
-            >
-              <Plus className="h-6 w-6 stroke-[2]" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="relative group border border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:shadow-lg hover:shadow-primary/5 cursor-pointer active:scale-95 text-muted-foreground hover:text-primary"
+                title="Add Flashcard"
+              >
+                <Plus className="h-6 w-6 stroke-[2]" />
+              </button>
+              <button
+                onClick={triggerCardGenerationFlow}
+                disabled={isGenerationDisabled}
+                className={`relative overflow-hidden group border rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out active:scale-95 text-muted-foreground hover:text-primary ${isGeneratingCards
+                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                    : isGenerationDisabled
+                      ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
+                      : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
+                  }`}
+                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +10 Cards"}
+              >
+                {isGeneratingCards && (
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-violet-200/10 to-violet-200/65 transition-all duration-100 ease-out pointer-events-none overflow-hidden"
+                    style={{ width: `${generationProgress}%` }}
+                  >
+                    <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
+                    <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-violet-200 shadow-[0_0_8px_#e9d5ff]" />
+                  </div>
+                )}
+                <span className="relative z-10 flex flex-col items-center justify-center">
+                  {isGeneratingCards ? (
+                    <>
+                      <RefreshCw className="h-6 w-6 stroke-[2] animate-spin text-primary-foreground" />
+                      <span className="text-[10px] font-bold mt-1.5 text-primary-foreground">Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-6 w-6 stroke-[2]" />
+                      <span className="text-[10px] font-bold mt-1.5">Generate +10</span>
+                    </>
+                  )}
+                </span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -230,6 +365,40 @@ export function DeckViewer({
                 title="Add Flashcard"
               >
                 <Plus className="h-6 w-6 stroke-[2]" />
+              </button>
+              <button
+                onClick={triggerCardGenerationFlow}
+                disabled={isGenerationDisabled}
+                className={`relative overflow-hidden group border rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out active:scale-95 text-muted-foreground hover:text-primary ${isGeneratingCards
+                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                    : isGenerationDisabled
+                      ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
+                      : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
+                  }`}
+                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +10 Cards"}
+              >
+                {isGeneratingCards && (
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-violet-200/10 to-violet-200/65 transition-all duration-100 ease-out pointer-events-none overflow-hidden"
+                    style={{ width: `${generationProgress}%` }}
+                  >
+                    <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
+                    <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-violet-200 shadow-[0_0_8px_#e9d5ff]" />
+                  </div>
+                )}
+                <span className="relative z-10 flex flex-col items-center justify-center">
+                  {isGeneratingCards ? (
+                    <>
+                      <RefreshCw className="h-6 w-6 stroke-[2] animate-spin text-primary-foreground" />
+                      <span className="text-[10px] font-bold mt-1.5 text-primary-foreground">Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-6 w-6 stroke-[2]" />
+                      <span className="text-[10px] font-bold mt-1.5">Generate +10</span>
+                    </>
+                  )}
+                </span>
               </button>
               {filteredCards.map((card) => (
                 <div
@@ -291,6 +460,165 @@ export function DeckViewer({
         onUpdateCard={handleUpdateCard}
         settings={settings}
         decryptedKeys={decryptedKeys}
+        setDecryptedKeys={setDecryptedKeys}
+      />
+
+      {/* Generate +10 Cards Confirmation Modal */}
+      {isConfirmModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsConfirmModalOpen(false)}
+            className="fixed inset-0 bg-background/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            aria-hidden="true"
+          />
+
+          {/* Modal Dialog */}
+          <div
+            className="relative z-10 w-full max-w-xl rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 space-y-8 text-left"
+            role="dialog"
+            aria-labelledby="generate-cards-modal-title"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 id="generate-cards-modal-title" className="font-display text-lg font-bold text-foreground">
+                  Generate 10 Flashcards
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground/90 leading-relaxed">
+              Topic: <span className="font-semibold text-foreground">{currentDeck.title}</span>
+            </p>
+
+            {/* Custom Instructions */}
+            <div className="space-y-1.5">
+              <label htmlFor="custom-instructions" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                Custom Instructions (Optional)
+              </label>
+              <textarea
+                id="custom-instructions"
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="language, focus, etc."
+                rows={3}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+              />
+            </div>
+
+            {/* Preferred Difficulty & Label */}
+            <div className="space-y-6">
+              <div className="space-y-1.5">
+                <label htmlFor="preferred-difficulty" className="text-xs font-semibold text-foreground block">
+                  Desired Difficulty
+                </label>
+                <select
+                  id="preferred-difficulty"
+                  value={preferredDifficulty}
+                  onChange={(e) => setPreferredDifficulty(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer h-9"
+                >
+                  <option value="">AI Decides</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="preferred-label" className="text-xs font-semibold text-foreground block">
+                  Desired Label
+                </label>
+                <input
+                  id="preferred-label"
+                  type="text"
+                  value={preferredLabel}
+                  onChange={(e) => setPreferredLabel(e.target.value)}
+                  placeholder="Theory, Coding-Pattern, etc."
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all h-9"
+                />
+              </div>
+            </div>
+
+            {/* Toggles and Settings */}
+            <div className="space-y-4">
+              {/* Context Switch */}
+              {currentDeck.cards.length > 0 && (
+                <div className="flex items-center justify-between gap-4 bg-secondary/15 p-3 rounded-2xl border border-border/40">
+                  <div className="flex-1">
+                    <label className="text-xs font-semibold text-foreground block">
+                      Prevent Duplicates
+                    </label>
+                    <span className="text-[10px] text-muted-foreground block leading-tight">
+                      Use existing card questions as context for the AI.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIncludeExistingAsContext(!includeExistingAsContext)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${includeExistingAsContext ? 'bg-primary' : 'bg-muted'
+                      }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${includeExistingAsContext ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {/* Hints Switch */}
+              <div className="flex items-center justify-between gap-4 bg-secondary/15 p-3 rounded-2xl border border-border/40">
+                <div className="flex-1">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Generate Hints
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShouldGenerateHints(!shouldGenerateHints)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${shouldGenerateHints ? 'bg-primary' : 'bg-muted'
+                    }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${shouldGenerateHints ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-border bg-background text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmGeneration}
+                className="px-5 py-2.5 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:opacity-95 active:scale-95 transition-all shadow-sm shadow-primary/20 cursor-pointer"
+              >
+                Generate 10 Cards
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Decrypt / BYOK Modal */}
+      <PinDecryptModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        provider={pinModalProvider}
+        onKeySuccess={(apiKey) => {
+          runRealCardGeneration(apiKey, shouldGenerateHints)
+        }}
         setDecryptedKeys={setDecryptedKeys}
       />
 
