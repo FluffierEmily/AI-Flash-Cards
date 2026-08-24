@@ -565,7 +565,10 @@ export function FlashcardReview({
                 <h4 className="font-medium text-foreground text-base sm:text-lg">{activeCard.question}</h4>
               </div>
               <div className="border-t border-border pt-4">
-                <p className="text-foreground leading-relaxed text-sm sm:text-base">{activeCard.answer}</p>
+                <p
+                  className="text-foreground leading-relaxed text-sm sm:text-base"
+                  dangerouslySetInnerHTML={{ __html: activeCard.answer }}
+                />
               </div>
             </div>
           </div>

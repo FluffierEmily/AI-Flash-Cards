@@ -316,9 +316,10 @@ export function EditFlashcardModal({
                 autoFocus
               />
             ) : (
-              <div className="w-full rounded-xl border border-border bg-secondary/15 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {answer}
-              </div>
+              <div
+                className="w-full rounded-xl border border-border bg-secondary/15 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: answer }}
+              />
             )}
           </div>
 
