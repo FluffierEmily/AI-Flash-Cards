@@ -8,13 +8,14 @@ export function formatCardPrompt(
   existingCards: { question: string }[],
   customInstructions?: string,
   preferredDifficulty?: string,
-  preferredLabel?: string
+  preferredLabel?: string,
+  cardCount: number = 10
 ): string {
   const existingCardsList = existingCards.length > 0
     ? existingCards.map((c, i) => `${i + 1}. ${c.question}`).join("\n")
     : "None"
 
-  let prompt = `Generate exactly 10 high-quality flashcards for a study deck.
+  let prompt = `Generate exactly ${cardCount} high-quality flashcards for a study deck.
 
 Deck Title: ${deckTitle}
 Deck Description: ${deckDescription || "No description"}`
@@ -58,7 +59,8 @@ export async function generateCards(
   customInstructions?: string,
   hintPromptTemplate?: string,
   preferredDifficulty?: string,
-  preferredLabel?: string
+  preferredLabel?: string,
+  cardCount: number = 10
 ): Promise<any[]> {
   const prompt = formatCardPrompt(
     deckTitle,
@@ -66,7 +68,8 @@ export async function generateCards(
     existingCards,
     customInstructions,
     preferredDifficulty,
-    preferredLabel
+    preferredLabel,
+    cardCount
   )
 
   // Dynamically build schema to only ask LLM to decide fields that are NOT predetermined
@@ -92,8 +95,8 @@ export async function generateCards(
 
   let generated = response.object.cards
 
-  if (generated.length > 10) {
-    generated = generated.slice(0, 10)
+  if (generated.length > cardCount) {
+    generated = generated.slice(0, cardCount)
   }
 
   // Inject predetermined labels and difficulties in post-processing

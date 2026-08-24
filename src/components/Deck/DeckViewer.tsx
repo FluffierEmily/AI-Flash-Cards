@@ -53,6 +53,7 @@ export function DeckViewer({
   const [preferredDifficulty, setPreferredDifficulty] = useState("")
   const [preferredLabel, setPreferredLabel] = useState("")
   const [generationProgress, setGenerationProgress] = useState(0)
+  const [cardCount, setCardCount] = useState(10)
 
   const isGenerationDisabled = isGeneratingCards || currentDeck.title.toLowerCase().includes("deck")
 
@@ -111,7 +112,8 @@ export function DeckViewer({
         customInstructions,
         settings.aiHintPrompt,
         preferredDifficulty || undefined,
-        preferredLabel || undefined
+        preferredLabel || undefined,
+        cardCount
       )
 
       const processedCards = newCards.map((cardData: any, idx: number) => ({
@@ -324,7 +326,7 @@ export function DeckViewer({
                       ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
                       : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
                   }`}
-                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +10 Cards"}
+                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
                   <div
@@ -344,7 +346,7 @@ export function DeckViewer({
                   ) : (
                     <>
                       <Sparkles className="h-6 w-6 stroke-[2]" />
-                      <span className="text-[10px] font-bold mt-1.5">Generate +10</span>
+                      <span className="text-[10px] font-bold mt-1.5">Generate +X</span>
                     </>
                   )}
                 </span>
@@ -375,7 +377,7 @@ export function DeckViewer({
                       ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
                       : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
                   }`}
-                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +10 Cards"}
+                title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
                   <div
@@ -395,7 +397,7 @@ export function DeckViewer({
                   ) : (
                     <>
                       <Sparkles className="h-6 w-6 stroke-[2]" />
-                      <span className="text-[10px] font-bold mt-1.5">Generate +10</span>
+                      <span className="text-[10px] font-bold mt-1.5">Generate +X</span>
                     </>
                   )}
                 </span>
@@ -485,7 +487,7 @@ export function DeckViewer({
               </div>
               <div>
                 <h3 id="generate-cards-modal-title" className="font-display text-lg font-bold text-foreground">
-                  Generate 10 Flashcards
+                  Generate {cardCount} Flashcards
                 </h3>
               </div>
             </div>
@@ -493,6 +495,39 @@ export function DeckViewer({
             <p className="text-sm text-muted-foreground/90 leading-relaxed">
               Topic: <span className="font-semibold text-foreground">{currentDeck.title}</span>
             </p>
+
+            {/* Card Count Selector */}
+            <div className="space-y-2">
+              <label htmlFor="card-count" className="text-xs font-semibold text-foreground flex items-center justify-between">
+                <span>Number of Cards to Generate</span>
+                <span className="text-primary font-bold">{cardCount}</span>
+              </label>
+              <div className="flex gap-2">
+                {[5, 10, 15, 20].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setCardCount(num)}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      cardCount === num
+                        ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                        : "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    +{num}
+                  </button>
+                ))}
+                <input
+                  id="card-count"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={cardCount}
+                  onChange={(e) => setCardCount(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                  className="w-16 rounded-xl border border-border bg-background px-2 py-2 text-xs font-semibold text-foreground text-center outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
 
             {/* Custom Instructions */}
             <div className="space-y-1.5">
@@ -604,7 +639,7 @@ export function DeckViewer({
                 onClick={handleConfirmGeneration}
                 className="px-5 py-2.5 rounded-xl bg-primary text-xs font-semibold text-primary-foreground hover:opacity-95 active:scale-95 transition-all shadow-sm shadow-primary/20 cursor-pointer"
               >
-                Generate 10 Cards
+                Generate {cardCount} Cards
               </button>
             </div>
           </div>
