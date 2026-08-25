@@ -13,7 +13,7 @@ export interface EvalResult {
 }
 
 export const EVAL_SCHEMA = z.object({
-  score: z.number().min(0).max(100),
+  score: z.number().min(0).max(100).describe("An integer score from 0 to 100 representing the accuracy percentage of the userAnswer compared to the referenceAnswer."),
   rating: z.enum(["again", "hard", "good", "easy"]),
   feedback: z.string(),
   correctParts: z.array(z.string()),
@@ -25,6 +25,9 @@ export const DEFAULT_EVAL_PROMPT = `You are an expert AI tutor helping a student
 Analyze the student's answer compared to the reference answer for the given question.
 Provide structured feedback on accuracy, correctness, and completeness.
 
+Guidelines for score:
+- Assign an integer score from 0 to 100 representing the overall correctness/accuracy of the userAnswer compared to the referenceAnswer (e.g. 85 for 85%). Do not use decimals or ratios between 0 and 1.
+
 Guidelines for rating:
 - "again": The student's answer is completely wrong, irrelevant, or empty.
 - "hard": The student got the core concept but missed key details, or made significant errors.
@@ -33,9 +36,9 @@ Guidelines for rating:
 
 export function formatPrompt(template: string, question: string, referenceAnswer: string, userAnswer: string): string {
   let prompt = template || DEFAULT_EVAL_PROMPT
-  
+
   const hasPlaceholders = prompt.includes("{question}") || prompt.includes("{referenceAnswer}") || prompt.includes("{userAnswer}")
-  
+
   if (hasPlaceholders) {
     prompt = prompt
       .replace(/{question}/g, question)
@@ -49,7 +52,7 @@ Question: ${question}
 Reference Answer: ${referenceAnswer}
 Student's Answer: ${userAnswer}`
   }
-  
+
   return prompt
 }
 
@@ -63,16 +66,23 @@ export async function evaluateAnswer(
   modelName?: string
 ): Promise<EvalResult> {
   const prompt = formatPrompt(promptTemplate, question, referenceAnswer, userAnswer)
-  
+
   const response = await generateObject({
     model,
     schema: EVAL_SCHEMA,
     prompt,
     system: "You evaluate student answers for flashcards and output structured JSON feedback.",
   })
-  
+
+  const resultObj = { ...response.object }
+  // Defensive scaling: if score is in range (0, 1], scale to percentage out of 100
+  if (resultObj.score > 0 && resultObj.score <= 1) {
+    resultObj.score = resultObj.score * 100
+  }
+  resultObj.score = Math.round(resultObj.score)
+
   return {
-    ...response.object,
+    ...resultObj,
     provider,
     modelName
   }
