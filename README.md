@@ -220,7 +220,7 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [x] Homepage layout (landing page) with dummy buttons.
 - [x] Configure PWA support (`vite-plugin-pwa`, web manifest, icons).
 - [x] Implement deck management and flashcard creation workflows.
-- [ ] Build the interactive review session UI (card viewer, keyboard controls).
+- [x] Build the interactive review session UI (card viewer, keyboard controls).
 - [x] Integrate local spaced repetition scheduling logic.
 - [x] Add the AI evaluation layer (LLM scoring endpoint).
 - [x] Setup Firebase Cloud Messaging for PWA background push notifications.
