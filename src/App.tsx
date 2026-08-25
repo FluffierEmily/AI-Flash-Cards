@@ -657,6 +657,7 @@ export default function App() {
             ) : isReviewing ? (
               <FlashcardReview
                 cards={reviewQueue}
+                decks={decks}
                 settings={settings}
                 onUpdateSetting={handleUpdateSetting}
                 decryptedKeys={decryptedKeys}

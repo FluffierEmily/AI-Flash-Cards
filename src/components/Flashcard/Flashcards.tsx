@@ -7,13 +7,15 @@ import {
   Meh,
   Smile,
   Zap,
-  ArrowLeft,
+  X,
   HelpCircle,
   Settings
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
 import type { SettingsState } from "../Settings"
+import type { Deck } from "../Deck/Deck"
+import { INITIAL_DECKS } from "../Deck/Decks"
 import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { ModelSelectorModal } from "../ModelSelectorModal"
@@ -55,6 +57,7 @@ export const SAMPLE_CARDS: Flashcard[] = [
 
 export interface FlashcardReviewProps {
   cards: Flashcard[]
+  decks?: Deck[]
   settings: SettingsState
   onUpdateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
   decryptedKeys: Record<string, string>
@@ -71,6 +74,7 @@ export interface FlashcardReviewProps {
 
 export function FlashcardReview({
   cards = [],
+  decks = [],
   settings,
   decryptedKeys,
   setDecryptedKeys,
@@ -286,6 +290,8 @@ export function FlashcardReview({
   }
 
   const activeCard = cards[activeCardIndex]
+  const activeDeck = decks.find((d) => d.id === activeCard?.deckId) || INITIAL_DECKS.find((d) => d.id === activeCard?.deckId)
+  const deckName = activeDeck?.title || ""
 
   const handleScore = (rating: "again" | "hard" | "good" | "easy") => {
     setStats((prev) => ({
@@ -370,34 +376,34 @@ export function FlashcardReview({
           <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none" />
 
           {/* Card Meta Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 relative">
             <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
+              Review
+            </h3>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+              {deckName && (
+                <span className="text-sm font-medium text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] whitespace-nowrap">
+                  {deckName}
+                </span>
+              )}
+              {activeCard.label?.trim() && (
+                <span className="rounded-lg bg-secondary px-2.5 py-0.5 text-[10px] font-semibold text-secondary-foreground mt-1 pointer-events-auto">
+                  {activeCard.label}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
               {onClose && (
                 <button
                   type="button"
                   onClick={onClose}
-                  className="mr-1 p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  title="Back to Dashboard"
-                  aria-label="Back to Dashboard"
+                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Close Review"
+                  aria-label="Close Review"
                 >
-                  <ArrowLeft className="h-5 w-5" />
+                  <X className="h-5 w-5" />
                 </button>
               )}
-              Review Flash Card
-            </h3>
-            <div className="flex items-center gap-2">
-              {/* Settings button to open model selector */}
-              <button
-                type="button"
-                onClick={() => setIsModelSelectorOpen(true)}
-                className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
-              >
-                <Settings className="h-4.5 w-4.5" />
-              </button>
-              <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                {activeCard.label}
-              </span>
             </div>
           </div>
 
@@ -527,21 +533,22 @@ export function FlashcardReview({
           <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none" />
 
           {/* Card Meta Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 relative">
             <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
-              {onClose && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="mr-1 p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  title="Back to Dashboard"
-                  aria-label="Back to Dashboard"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-              )}
-              Review Flash Card
+              Review
             </h3>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+              {deckName && (
+                <span className="text-sm font-medium text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] whitespace-nowrap">
+                  {deckName}
+                </span>
+              )}
+              {activeCard.label?.trim() && (
+                <span className="rounded-lg bg-secondary px-2.5 py-0.5 text-[10px] font-semibold text-secondary-foreground mt-1 pointer-events-auto">
+                  {activeCard.label}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {/* Settings button to open model selector */}
               <button
@@ -552,9 +559,17 @@ export function FlashcardReview({
               >
                 <Settings className="h-4.5 w-4.5" />
               </button>
-              <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                {activeCard.label}
-              </span>
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Close Review"
+                  aria-label="Close Review"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
 
