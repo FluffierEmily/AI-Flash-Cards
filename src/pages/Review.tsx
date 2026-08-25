@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom"
 import { FlashcardReview } from "../components/Flashcard/Flashcards"
 import type { Deck } from "../components/Deck/Deck"
 import type { SettingsState } from "../components/Settings"
-import { calculateNextReview } from "../lib/spacedRepetition"
+import { calculateNextReview, recordNewCardReviewed } from "../lib/spacedRepetition"
 import { saveReviewHistoryRecord } from "../lib/historyStorage"
 
 interface ReviewPageProps {
@@ -47,6 +47,10 @@ export function Review({
           }
 
           if (!cardToReview) return
+
+          if (!cardToReview.nextReviewDate) {
+            recordNewCardReviewed(cardId)
+          }
 
           const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
           newHistoryEntry.reviewDuration = reviewDuration

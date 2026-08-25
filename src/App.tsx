@@ -22,7 +22,7 @@ import { Review } from "./pages/Review"
 import { DeckOverview, DeckViewer } from "./pages/DeckOverview"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
-import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
+import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
 import { saveReviewHistoryRecord, clearAllReviewHistory } from "./lib/historyStorage"
 
 function AppContent() {
@@ -459,7 +459,17 @@ function AppContent() {
     due: getDeckDueCount(d, settings)
   }))
 
-  const totalReviewsDue = decksWithDueCounts.filter(d => d.enabled).reduce((acc, deck) => acc + deck.due, 0)
+  const totalReviewsDue = (() => {
+    if (!settings.spacedRepetition) return 0
+    const enabledDecks = decks.filter(d => d.enabled)
+    const allCards = enabledDecks.flatMap(d => d.cards)
+    const now = new Date()
+    const scheduledDue = allCards.filter(c => c.nextReviewDate && new Date(c.nextReviewDate) <= now).length
+    const newCards = allCards.filter(c => !c.nextReviewDate).length
+    const reviewedToday = getNewCardsReviewedTodayCount()
+    const allowedNewCards = Math.max(0, 10 - reviewedToday)
+    return scheduledDue + Math.min(newCards, allowedNewCards)
+  })()
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans selection:bg-primary/30 relative">

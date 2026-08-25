@@ -121,6 +121,63 @@ export function calculateNextReview(
   }
 }
 
+export function getNewCardsReviewedTodayCount(): number {
+  if (typeof window === "undefined") return 0
+  
+  const now = new Date()
+  const boundary = new Date(now)
+  boundary.setHours(3, 0, 0, 0)
+  if (now < boundary) {
+    boundary.setDate(boundary.getDate() - 1)
+  }
+  const boundaryStr = boundary.toISOString()
+
+  try {
+    const saved = localStorage.getItem("new_cards_reviewed_today")
+    if (saved) {
+      const data = JSON.parse(saved)
+      if (data && data.lastReset === boundaryStr) {
+        return Array.isArray(data.cardIds) ? data.cardIds.length : 0
+      }
+    }
+  } catch (e) {
+    console.error("Failed to parse new_cards_reviewed_today", e)
+  }
+  return 0
+}
+
+export function recordNewCardReviewed(cardId: string) {
+  if (typeof window === "undefined") return
+  
+  const now = new Date()
+  const boundary = new Date(now)
+  boundary.setHours(3, 0, 0, 0)
+  if (now < boundary) {
+    boundary.setDate(boundary.getDate() - 1)
+  }
+  const boundaryStr = boundary.toISOString()
+
+  try {
+    let cardIds: string[] = []
+    const saved = localStorage.getItem("new_cards_reviewed_today")
+    if (saved) {
+      const data = JSON.parse(saved)
+      if (data && data.lastReset === boundaryStr && Array.isArray(data.cardIds)) {
+        cardIds = data.cardIds
+      }
+    }
+    if (!cardIds.includes(cardId)) {
+      cardIds.push(cardId)
+      localStorage.setItem("new_cards_reviewed_today", JSON.stringify({
+        lastReset: boundaryStr,
+        cardIds
+      }))
+    }
+  } catch (e) {
+    console.error("Failed to save new_cards_reviewed_today", e)
+  }
+}
+
 /**
  * Returns the count of due cards for a deck.
  */
@@ -138,8 +195,10 @@ export function getDeckDueCount(deck: Deck, settings: SettingsState): number {
   // New cards: no nextReviewDate (never reviewed)
   const newCards = deck.cards.filter((c) => !c.nextReviewDate).length
 
-  // Capped up to 10 new cards at a time
-  return scheduledDue + Math.min(newCards, 10)
+  // Cap based on remaining global new cards allowance
+  const reviewedToday = getNewCardsReviewedTodayCount()
+  const allowedNewCards = Math.max(0, 10 - reviewedToday)
+  return scheduledDue + Math.min(newCards, allowedNewCards)
 }
 
 /**
@@ -165,8 +224,10 @@ export function getReviewQueue(
   // 2. New cards (never reviewed)
   const newCards = allCards.filter((c) => !c.nextReviewDate)
 
-  // Limit new cards to 10 at a time
-  const selectedNewCards = newCards.slice(0, 10)
+  // Limit new cards based on remaining global allowance
+  const reviewedToday = getNewCardsReviewedTodayCount()
+  const allowedNewCards = Math.max(0, 10 - reviewedToday)
+  const selectedNewCards = newCards.slice(0, allowedNewCards)
 
   let queue = [...scheduledDue, ...selectedNewCards]
 
