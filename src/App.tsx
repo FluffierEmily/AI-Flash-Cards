@@ -19,7 +19,7 @@ import { INITIAL_DECKS } from "./components/Deck/Decks"
 import { type Deck } from "./components/Deck/Deck"
 import { Dashboard } from "./pages/Dashboard"
 import { Review } from "./pages/Review"
-import { Decks, DeckViewer } from "./pages/Decks"
+import { DeckOverview, DeckViewer } from "./pages/DeckOverview"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
@@ -647,14 +647,14 @@ function AppContent() {
                   setReviewQueue(queue)
                   navigate("/review")
                 }}
-                onBrowseDecks={() => navigate("/decks")}
+                onBrowseDecks={() => navigate("/deck-overview")}
               />
             }
           />
           <Route
-            path="/decks"
+            path="/deck-overview"
             element={
-              <Decks
+              <DeckOverview
                 decks={decksWithDueCounts}
                 editingDeckId={null}
                 onSelectDeck={(id) => navigate(`/deck/${id}`)}
@@ -798,7 +798,7 @@ function DeckRouteWrapper({
     <div className="flex flex-col gap-6">
       <DeckViewer
         currentDeck={currentDeck}
-        onClose={() => navigate("/decks")}
+        onClose={() => navigate("/deck-overview")}
         onUpdateDeck={handleUpdateDeck}
         onAddCard={handleAddCardToDeck}
         onDeleteCard={handleDeleteCardFromDeck}
@@ -810,7 +810,7 @@ function DeckRouteWrapper({
         }}
         onDeleteDeck={(id) => {
           handleDeleteDeck(id)
-          navigate("/decks")
+          navigate("/deck-overview")
         }}
         settings={settings}
         decryptedKeys={decryptedKeys}

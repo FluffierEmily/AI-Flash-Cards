@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, RefreshCw } from "lucide-react"
 import { useNavigate } from "react-router-dom"
-import { DummyDecks } from "../components/Deck/Decks"
+import { DeckList } from "../components/Deck/Decks"
 import type { Deck } from "../components/Deck/Deck"
 import { AddFlashcardModal } from "../components/Flashcard/AddFlashcardModal"
 import { EditFlashcardModal } from "../components/Flashcard/EditFlashcardModal"
@@ -11,7 +11,7 @@ import { generateCards } from "../lib/aiCardGenerator"
 import { getModelInstance } from "../lib/ai"
 import { PinDecryptModal } from "../components/PinDecryptModal"
 
-interface DecksPageProps {
+interface DeckOverviewPageProps {
   decks: Deck[]
   editingDeckId: string | null
   onSelectDeck: (deckId: string) => void
@@ -19,17 +19,17 @@ interface DecksPageProps {
   onCreateNewDeck: () => void
 }
 
-export function Decks({
+export function DeckOverview({
   decks,
   editingDeckId,
   onSelectDeck,
   onToggleDeckEnabled,
   onCreateNewDeck
-}: DecksPageProps) {
+}: DeckOverviewPageProps) {
   const navigate = useNavigate()
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <DummyDecks
+      <DeckList
         decks={decks}
         editingDeckId={editingDeckId}
         onSelectDeck={onSelectDeck}

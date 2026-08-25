@@ -79,7 +79,7 @@ export const INITIAL_DECKS: Deck[] = [
   }
 ]
 
-interface DummyDecksProps {
+interface DeckListProps {
   decks: Deck[]
   editingDeckId: string | null
   onSelectDeck: (deckId: string) => void
@@ -88,14 +88,14 @@ interface DummyDecksProps {
   onClose?: () => void
 }
 
-export function DummyDecks({
+export function DeckList({
   decks,
   editingDeckId,
   onSelectDeck,
   onToggleDeckEnabled,
   onCreateNewDeck,
   onClose,
-}: DummyDecksProps) {
+}: DeckListProps) {
   const activeCount = decks.filter(d => d.enabled).length
 
   return (
