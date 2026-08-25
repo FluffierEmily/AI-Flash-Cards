@@ -18,8 +18,8 @@ import type { Deck } from "../Deck/Deck"
 import { INITIAL_DECKS } from "../Deck/Decks"
 import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
-import { ModelSelectorModal } from "../ModelSelectorModal"
-import { PinDecryptModal } from "../PinDecryptModal"
+import { ModelSelectorModal } from "../modals/ModelSelectorModal"
+import { PinDecryptModal } from "../modals/PinDecryptModal"
 import { getDeckDueCount, getNewCardsReviewedTodayCount } from "../../lib/spacedRepetition"
 
 export const SAMPLE_CARDS: Flashcard[] = [

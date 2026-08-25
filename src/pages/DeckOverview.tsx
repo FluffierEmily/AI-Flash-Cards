@@ -3,13 +3,13 @@ import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, Refresh
 import { useNavigate } from "react-router-dom"
 import { DeckList } from "../components/Deck/Decks"
 import type { Deck } from "../components/Deck/Deck"
-import { AddFlashcardModal } from "../components/Flashcard/AddFlashcardModal"
-import { EditFlashcardModal } from "../components/Flashcard/EditFlashcardModal"
+import { AddFlashcardModal } from "../components/modals/AddFlashcardModal"
+import { EditFlashcardModal } from "../components/modals/EditFlashcardModal"
 import type { Flashcard } from "../components/Flashcard/Flashcard"
 import type { SettingsState } from "../components/Settings"
 import { generateCards } from "../lib/aiCardGenerator"
 import { getModelInstance } from "../lib/ai"
-import { PinDecryptModal } from "../components/PinDecryptModal"
+import { PinDecryptModal } from "../components/modals/PinDecryptModal"
 
 interface DeckOverviewPageProps {
   decks: Deck[]
@@ -357,7 +357,7 @@ export function DeckViewer({
                   : isGenerationDisabled
                     ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
                     : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
-                }`}
+                  }`}
                 title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
@@ -408,7 +408,7 @@ export function DeckViewer({
                   : isGenerationDisabled
                     ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
                     : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
-                }`}
+                  }`}
                 title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
@@ -540,11 +540,10 @@ export function DeckViewer({
                     key={num}
                     type="button"
                     onClick={() => setCardCount(num)}
-                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      cardCount === num
-                        ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
-                        : "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${cardCount === num
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                      : "border-border bg-background hover:bg-secondary text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     +{num}
                   </button>

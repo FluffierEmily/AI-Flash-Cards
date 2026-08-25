@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { Key, X, Lock, AlertCircle, Check, RefreshCw } from "lucide-react"
-import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "../lib/crypto"
-import { saveEncryptedApiKey, getEncryptedApiKey } from "../lib/db"
+import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "../../lib/crypto"
+import { saveEncryptedApiKey, getEncryptedApiKey } from "../../lib/db"
 
 export interface PinDecryptModalProps {
   isOpen: boolean
@@ -61,7 +61,7 @@ export function PinDecryptModal({
         }
 
         const decrypted = await decryptApiKey(encryptedPayload, pinInput.trim())
-        
+
         // Decrypted successfully!
         setDecryptedKeys((prev) => ({ ...prev, [provider.toLowerCase()]: decrypted }))
         setPinStatus({ type: "success", msg: "Decrypted successfully!" })
@@ -120,7 +120,7 @@ export function PinDecryptModal({
         }}
         className="fixed inset-0 bg-background/80 backdrop-blur-sm cursor-pointer"
       />
-      
+
       {/* Modal dialog */}
       <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-2xl shadow-xl overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in duration-200 text-left">
         <div className="flex items-center justify-between border-b border-border/60 pb-3">

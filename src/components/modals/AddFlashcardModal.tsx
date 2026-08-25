@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react"
 import { Plus, X, Check, GripVertical, Trash2, Sparkles, Settings as SettingsIcon, RefreshCw } from "lucide-react"
-import type { Flashcard, Difficulty } from "./Flashcard"
+import type { Flashcard, Difficulty } from "../Flashcard/Flashcard"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import { loadDecks, saveDecks } from "../../lib/deckStorage"
-import { ModelSelectorModal } from "../ModelSelectorModal"
-import { PinDecryptModal } from "../PinDecryptModal"
+import { ModelSelectorModal } from "./ModelSelectorModal"
+import { PinDecryptModal } from "./PinDecryptModal"
 import type { SettingsState } from "../Settings"
 import { getModelInstance } from "../../lib/ai"
 import { generateHints } from "../../lib/aiHints"
@@ -263,20 +263,19 @@ export function AddFlashcardModal({
               <label className="text-xs font-semibold text-foreground">
                 Hints (Drag to reorder)
               </label>
-              
+
               <div className="flex items-center gap-2">
                 {/* Generate Hints Button with Shimmer Progress */}
                 <button
                   type="button"
                   onClick={triggerHintGeneration}
                   disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || isAnswerEmpty}
-                  className={`relative overflow-hidden flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-200 active:scale-95 shadow-sm ${
-                    isGeneratingHints
-                      ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                      : hints.length >= 3 || !question.trim() || isAnswerEmpty
-                        ? "bg-primary opacity-40 pointer-events-none"
-                        : "bg-primary cursor-pointer hover:opacity-95"
-                  }`}
+                  className={`relative overflow-hidden flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-200 active:scale-95 shadow-sm ${isGeneratingHints
+                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                    : hints.length >= 3 || !question.trim() || isAnswerEmpty
+                      ? "bg-primary opacity-40 pointer-events-none"
+                      : "bg-primary cursor-pointer hover:opacity-95"
+                    }`}
                   title={
                     !question.trim() || isAnswerEmpty
                       ? "Enter question and answer to generate hints"
