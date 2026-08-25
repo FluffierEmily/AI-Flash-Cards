@@ -232,30 +232,40 @@ export function Dashboard({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 pt-2 justify-items-center">
             {STATUS_METADATA.map((status) => (
               <div
                 key={status.key}
-                className={`relative group rounded-2xl border p-4 transition-all duration-200 hover:scale-[1.01] hover:shadow-xs flex flex-col justify-between ${status.bgColor} ${status.borderColor}`}
+                className="relative group flex flex-col items-center justify-center transition-all duration-200"
               >
-                <div className="space-y-1">
+                {/* Circle with card count inside */}
+                <div
+                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex flex-col items-center justify-center shadow-xs transition-all duration-300 ${status.bgColor} ${status.borderColor} group-hover:scale-105 group-hover:shadow-md`}
+                >
+                  <span className="text-3xl sm:text-4xl font-extrabold font-display text-foreground leading-none">
+                    {latestHistory[status.key] ?? 0}
+                  </span>
+                  <span className="text-[10px] font-semibold text-muted-foreground mt-1.5 uppercase tracking-wider">
+                    cards
+                  </span>
+                </div>
+
+                {/* Badge underneath the circle */}
+                <div className="mt-3">
                   <span
-                    className="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                    style={{ color: status.color, border: `1px solid ${status.color}33` }}
+                    className="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+                    style={{
+                      color: status.color,
+                      backgroundColor: `${status.color}15`,
+                      border: `1px solid ${status.color}33`
+                    }}
                   >
                     {status.label}
                   </span>
                 </div>
 
-                <div className="mt-4">
-                  <span className="text-3xl font-bold font-display text-foreground">
-                    {latestHistory[status.key] ?? 0}
-                  </span>
-                  <span className="text-xs font-medium text-muted-foreground ml-1">cards</span>
-                </div>
-
                 {/* Tooltip for Success Level */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-popover border border-border text-popover-foreground text-[11px] font-medium px-3 py-1.5 rounded-xl shadow-lg z-30 pointer-events-none animate-in fade-in slide-in-from-bottom-1 duration-200 whitespace-nowrap">
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-[11px] font-medium px-3 py-1.5 rounded-xl shadow-lg z-30 pointer-events-none animate-in fade-in slide-in-from-bottom-1 duration-200 whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <Info className="h-3.5 w-3.5" style={{ color: status.color }} />
                     <span>
