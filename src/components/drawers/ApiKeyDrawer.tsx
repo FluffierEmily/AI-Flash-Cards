@@ -2,7 +2,7 @@ import React from "react"
 import { ShieldCheck, ChevronDown, Lock, Key, AlertCircle, Check, Unlock, Trash2, Sparkles } from "lucide-react"
 import type { EncryptedPayload } from "../../lib/crypto"
 import { PROVIDER_MODELS } from "../../lib/ai"
-import type { SettingsState } from "../Settings"
+import type { SettingsState } from "../../pages/Settings"
 
 function DatabaseIcon(props: React.SVGProps<SVGSVGElement>) {
   return (

@@ -1,6 +1,6 @@
 import type { Flashcard, MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
-import type { SettingsState } from "../components/Settings"
+import type { SettingsState } from "../pages/Settings"
 import { fcmCloudService } from "./fcm"
 export interface LocalReminder {
   id: string

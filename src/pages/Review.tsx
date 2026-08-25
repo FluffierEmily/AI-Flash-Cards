@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom"
 import { FlashcardReview } from "../components/Flashcard/Flashcards"
 import type { Deck } from "../components/Deck/Deck"
-import type { SettingsState } from "../components/Settings"
+import type { SettingsState } from "./Settings"
 import { calculateNextReview, recordNewCardReviewed } from "../lib/spacedRepetition"
 import { saveReviewHistoryRecord } from "../lib/historyStorage"
 

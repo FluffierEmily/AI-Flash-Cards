@@ -3,7 +3,7 @@ import {
   Sun,
   Moon,
   Sparkles,
-  Settings,
+  Settings as SettingsIcon,
   Key,
   Smartphone,
   Bell,
@@ -14,7 +14,7 @@ import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypt
 import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "./lib/db"
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
 import { useFcm } from "./components/drawers/FcmDrawer"
-import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
+import { Settings, type SettingsState, DEFAULT_SETTINGS } from "./pages/Settings"
 import { INITIAL_DECKS } from "./components/Deck/Decks"
 import { type Deck } from "./components/Deck/Deck"
 import { Dashboard } from "./pages/Dashboard"
@@ -22,8 +22,8 @@ import { Review } from "./pages/Review"
 import { DeckOverview, DeckViewer } from "./pages/DeckOverview"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
-import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
-import { saveReviewHistoryRecord, clearAllReviewHistory } from "./lib/historyStorage"
+import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
+import { clearAllReviewHistory } from "./lib/historyStorage"
 
 function AppContent() {
   // Decks & Deck Editor State
@@ -141,7 +141,6 @@ function AppContent() {
   })
 
   // Settings State & Local Storage Persistence
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settings, setSettings] = useState<SettingsState>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("app_settings")
@@ -198,7 +197,6 @@ function AppContent() {
 
       await clearAllReviewHistory()
       setDecks(resetDecks)
-      setIsSettingsOpen(false)
       alert("Review history and card progress have been successfully reset!")
       navigate("/dashboard")
     } catch (err: any) {
@@ -631,13 +629,13 @@ function AppContent() {
 
             {/* Header Settings Button */}
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${isSettingsOpen ? "ring-2 ring-primary/40 border-primary" : ""
+              onClick={() => navigate("/settings")}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${location.pathname === "/settings" ? "ring-2 ring-primary/40 border-primary" : ""
                 }`}
               aria-label="Settings"
               title="Settings"
             >
-              <Settings className="h-5 w-5" />
+              <SettingsIcon className="h-5 w-5" />
             </button>
           </nav>
         </div>
@@ -703,20 +701,21 @@ function AppContent() {
               />
             }
           />
+          <Route
+            path="/settings"
+            element={
+              <Settings
+                settings={settings}
+                onUpdateSetting={handleUpdateSetting}
+                onResetDefaults={handleResetSettings}
+                onOpenDrawerStep={(step) => setActiveDrawerStep(step)}
+                onResetData={handleResetData}
+              />
+            }
+          />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
-
-      {/* Settings Bottom-Sliding Modal Drawer */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onUpdateSetting={handleUpdateSetting}
-        onResetDefaults={handleResetSettings}
-        onOpenDrawerStep={(step) => setActiveDrawerStep(step)}
-        onResetData={handleResetData}
-      />
 
       {/* Closable Setup Drawer Modal */}
       <SetupDrawer

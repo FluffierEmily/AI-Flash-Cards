@@ -13,14 +13,14 @@ import {
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
-import type { SettingsState } from "../Settings"
+import type { SettingsState } from "../../pages/Settings"
 import type { Deck } from "../Deck/Deck"
 import { INITIAL_DECKS } from "../Deck/Decks"
 import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { ModelSelectorModal } from "../modals/ModelSelectorModal"
 import { PinDecryptModal } from "../modals/PinDecryptModal"
-import { getDeckDueCount, getNewCardsReviewedTodayCount } from "../../lib/spacedRepetition"
+import { getNewCardsReviewedTodayCount } from "../../lib/spacedRepetition"
 
 export const SAMPLE_CARDS: Flashcard[] = [
   {

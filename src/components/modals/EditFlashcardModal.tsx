@@ -5,7 +5,7 @@ import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import { loadDecks, saveDecks } from "../../lib/deckStorage"
 import { ModelSelectorModal } from "./ModelSelectorModal"
 import { PinDecryptModal } from "./PinDecryptModal"
-import type { SettingsState } from "../Settings"
+import type { SettingsState } from "../../pages/Settings"
 import { getModelInstance } from "../../lib/ai"
 import { generateHints } from "../../lib/aiHints"
 
