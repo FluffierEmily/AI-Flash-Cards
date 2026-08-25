@@ -30,6 +30,7 @@ export function AddFlashcardModal({
 }: AddFlashcardModalProps) {
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
+  const isAnswerEmpty = !answer.replace(/<[^>]*>/g, "").trim()
   const [label, setLabel] = useState("General")
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
   const [hints, setHints] = useState<string[]>([])
@@ -103,7 +104,7 @@ export function AddFlashcardModal({
 
   const triggerHintGeneration = async () => {
     const count = 3 - hints.length
-    if (count <= 0 || !question.trim() || !answer.trim()) return
+    if (count <= 0 || !question.trim() || isAnswerEmpty) return
 
     const provider = hintProvider || settings.aiModelProvider
 
@@ -159,7 +160,7 @@ export function AddFlashcardModal({
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!question.trim() || !answer.trim()) return
+    if (!question.trim() || isAnswerEmpty) return
 
     const newCard: Flashcard = {
       id: Date.now().toString(),
@@ -245,16 +246,14 @@ export function AddFlashcardModal({
             />
           </div>
 
-          <div>
+          <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground mb-1.5 block">
               Official Answer <span className="text-rose-500">*</span>
             </label>
-            <textarea
+            <RichTextEditor
               value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
+              onChange={setAnswer}
               placeholder="e.g. State is managed within the component, while props are passed into it..."
-              className="w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y min-h-[80px]"
-              rows={3}
             />
           </div>
 
@@ -270,16 +269,16 @@ export function AddFlashcardModal({
                 <button
                   type="button"
                   onClick={triggerHintGeneration}
-                  disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || !answer.trim()}
+                  disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || isAnswerEmpty}
                   className={`relative overflow-hidden flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-200 active:scale-95 shadow-sm ${
                     isGeneratingHints
                       ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                      : hints.length >= 3 || !question.trim() || !answer.trim()
+                      : hints.length >= 3 || !question.trim() || isAnswerEmpty
                         ? "bg-primary opacity-40 pointer-events-none"
                         : "bg-primary cursor-pointer hover:opacity-95"
                   }`}
                   title={
-                    !question.trim() || !answer.trim()
+                    !question.trim() || isAnswerEmpty
                       ? "Enter question and answer to generate hints"
                       : hints.length >= 3
                         ? "Max 3 hints reached"
@@ -430,7 +429,7 @@ export function AddFlashcardModal({
             </button>
             <button
               type="submit"
-              disabled={!question.trim() || !answer.trim()}
+              disabled={!question.trim() || isAnswerEmpty}
               className="flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-40 hover:opacity-95 transition-all shadow-sm cursor-pointer"
             >
               <Check className="h-4 w-4" />

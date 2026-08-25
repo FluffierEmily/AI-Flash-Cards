@@ -56,9 +56,9 @@ export function EditFlashcardModal({
   const [isEditingLabel, setIsEditingLabel] = useState(false)
   const [isEditingDifficulty, setIsEditingDifficulty] = useState(false)
 
-  // Local values
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
+  const isAnswerEmpty = !answer.replace(/<[^>]*>/g, "").trim()
   const [label, setLabel] = useState("General")
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
   const [hints, setHints] = useState<string[]>([])
@@ -141,7 +141,7 @@ export function EditFlashcardModal({
 
   const triggerHintGeneration = async () => {
     const count = 3 - hints.length
-    if (count <= 0 || !question.trim() || !answer.trim()) return
+    if (count <= 0 || !question.trim() || isAnswerEmpty) return
 
     const provider = hintProvider || settings.aiModelProvider
 
@@ -294,12 +294,12 @@ export function EditFlashcardModal({
               ) : (
                 <button
                   onClick={() => {
-                    if (answer.trim()) {
+                    if (!isAnswerEmpty) {
                       onUpdateCard({ ...card, answer: answer.trim() })
                       setIsEditingAnswer(false)
                     }
                   }}
-                  disabled={!answer.trim()}
+                  disabled={isAnswerEmpty}
                   className="p-1 rounded-lg text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10 transition-all cursor-pointer disabled:opacity-40 shrink-0"
                   title="Save Answer"
                 >
@@ -308,13 +308,13 @@ export function EditFlashcardModal({
               )}
             </div>
             {isEditingAnswer ? (
-              <textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-y min-h-[80px]"
-                rows={3}
-                autoFocus
-              />
+              <div className="space-y-2">
+                <RichTextEditor
+                  value={answer}
+                  onChange={setAnswer}
+                  placeholder="e.g. State is managed within the component, while props are passed into it..."
+                />
+              </div>
             ) : (
               <div
                 className="w-full rounded-xl border border-border bg-secondary/15 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed"
@@ -333,15 +333,15 @@ export function EditFlashcardModal({
                 <button
                   type="button"
                   onClick={triggerHintGeneration}
-                  disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || !answer.trim()}
+                  disabled={isGeneratingHints || hints.length >= 3 || !question.trim() || isAnswerEmpty}
                   className={`relative overflow-hidden flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all duration-200 active:scale-95 shadow-sm ${isGeneratingHints
                     ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                    : hints.length >= 3 || !question.trim() || !answer.trim()
+                    : hints.length >= 3 || !question.trim() || isAnswerEmpty
                       ? "bg-primary opacity-40 pointer-events-none"
                       : "bg-primary cursor-pointer hover:opacity-95"
                     }`}
                   title={
-                    !question.trim() || !answer.trim()
+                    !question.trim() || isAnswerEmpty
                       ? "Enter question and answer to generate hints"
                       : hints.length >= 3
                         ? "Max 3 hints reached"
