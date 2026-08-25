@@ -1,4 +1,4 @@
-import { Plus, Layers } from "lucide-react"
+import { Plus, Layers, X } from "lucide-react"
 import type { Deck } from "./Deck"
 
 export const INITIAL_DECKS: Deck[] = [
@@ -85,6 +85,7 @@ interface DummyDecksProps {
   onSelectDeck: (deckId: string) => void
   onToggleDeckEnabled: (deckId: string) => void
   onCreateNewDeck: () => void
+  onClose?: () => void
 }
 
 export function DummyDecks({
@@ -93,6 +94,7 @@ export function DummyDecks({
   onSelectDeck,
   onToggleDeckEnabled,
   onCreateNewDeck,
+  onClose,
 }: DummyDecksProps) {
   const activeCount = decks.filter(d => d.enabled).length
 
@@ -106,6 +108,15 @@ export function DummyDecks({
             {activeCount} Active
           </span>
         </h3>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+            title="Close Decks"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="space-y-3 overflow-y-auto max-h-[300px] sm:max-h-[420px] lg:max-h-[520px] pr-1 scrollbar-thin">
         {decks.map((deck) => {

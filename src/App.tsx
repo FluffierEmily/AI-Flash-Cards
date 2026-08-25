@@ -9,27 +9,29 @@ import {
   Bell,
   Info
 } from "lucide-react"
+import { HashRouter as Router, Routes, Route, useNavigate, useLocation, useParams, Navigate } from "react-router-dom"
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypto"
 import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "./lib/db"
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
 import { useFcm } from "./components/drawers/FcmDrawer"
 import { SettingsModal, type SettingsState, DEFAULT_SETTINGS } from "./components/Settings"
-import { FlashcardReview } from "./components/Flashcard/Flashcards"
-import { DummyDecks, INITIAL_DECKS } from "./components/Deck/Decks"
+import { INITIAL_DECKS } from "./components/Deck/Decks"
 import { type Deck } from "./components/Deck/Deck"
-import { DeckViewer } from "./components/Deck/DeckViewer"
-import { Dashboard } from "./components/Dashboard"
+import { Dashboard } from "./pages/Dashboard"
+import { Review } from "./pages/Review"
+import { Decks, DeckViewer } from "./pages/Decks"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { calculateNextReview, getDeckDueCount, getReviewQueue, syncFcmReminders } from "./lib/spacedRepetition"
 import { saveReviewHistoryRecord, clearAllReviewHistory } from "./lib/historyStorage"
 
-export default function App() {
+function AppContent() {
   // Decks & Deck Editor State
   const [decks, setDecks] = useState<Deck[]>([])
   const [hasLoadedDecks, setHasLoadedDecks] = useState(false)
-  const [editingDeckId, setEditingDeckId] = useState<string | null>(null)
-  const [isReviewing, setIsReviewing] = useState(false)
+
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // Load decks asynchronously on mount
   useEffect(() => {
@@ -51,6 +53,27 @@ export default function App() {
       saveDecks(decks)
     }
   }, [decks, hasLoadedDecks])
+
+  // Restore route on load
+  useEffect(() => {
+    const savedPath = localStorage.getItem("current_page")
+    if (savedPath && savedPath !== location.pathname) {
+      if (savedPath.startsWith("/review") && reviewQueue.length === 0) {
+        navigate("/dashboard", { replace: true })
+      } else {
+        navigate(savedPath, { replace: true })
+      }
+    } else if (location.pathname === "/") {
+      navigate("/dashboard", { replace: true })
+    }
+  }, [])
+
+  // Save route on change
+  useEffect(() => {
+    if (location.pathname && location.pathname !== "/" && !location.pathname.startsWith("/review")) {
+      localStorage.setItem("current_page", location.pathname)
+    }
+  }, [location.pathname])
 
   const toggleDeckEnabled = (deckId: string) => {
     setDecks(prev =>
@@ -101,16 +124,13 @@ export default function App() {
       cards: []
     }
     setDecks(prev => [...prev, newDeck])
-    setEditingDeckId(newDeckId)
-    setIsReviewing(false)
+    navigate(`/deck/${newDeckId}`)
   }
 
   const handleDeleteDeck = (deckId: string) => {
     setDecks(prev => prev.filter(d => d.id !== deckId))
-    if (editingDeckId === deckId) {
-      setEditingDeckId(null)
-    }
   }
+
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme")
@@ -180,6 +200,7 @@ export default function App() {
       setDecks(resetDecks)
       setIsSettingsOpen(false)
       alert("Review history and card progress have been successfully reset!")
+      navigate("/dashboard")
     } catch (err: any) {
       console.error("Failed to reset due dates and history:", err)
       alert(`Failed to reset data: ${err.message || err}`)
@@ -433,8 +454,6 @@ export default function App() {
     }
   }
 
-
-
   const decksWithDueCounts = decks.map(d => ({
     ...d,
     due: getDeckDueCount(d, settings)
@@ -450,7 +469,7 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
         <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/dashboard")}>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/20">
               <Sparkles className="h-5 w-5" />
             </div>
@@ -616,106 +635,66 @@ export default function App() {
 
       {/* Main Content */}
       <main className="container max-w-6xl mx-auto py-8 px-4 sm:px-6">
-
-        {/* Study Sandbox and Interactive Demo */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Your Decks Sidebar - Left Column */}
-          <div className="flex flex-col gap-6 lg:col-span-1">
-            <DummyDecks
-              decks={decksWithDueCounts}
-              editingDeckId={editingDeckId}
-              onSelectDeck={(id) => {
-                setEditingDeckId(id)
-                setIsReviewing(false)
-              }}
-              onToggleDeckEnabled={toggleDeckEnabled}
-              onCreateNewDeck={handleCreateNewDeck}
-            />
-          </div>
-
-          {/* Main Showcase / Deck Editor Area - Right Column */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {editingDeckId && decks.find(d => d.id === editingDeckId) ? (
-              <DeckViewer
-                currentDeck={decks.find(d => d.id === editingDeckId)!}
-                onClose={() => setEditingDeckId(null)}
-                onUpdateDeck={handleUpdateDeck}
-                onAddCard={handleAddCardToDeck}
-                onDeleteCard={handleDeleteCardFromDeck}
-                dueCount={getDeckDueCount(decks.find(d => d.id === editingDeckId)!, settings)}
-                onStartReviewDeck={(deckId) => {
-                  const queue = getReviewQueue(decks, settings, deckId)
-                  setReviewQueue(queue)
-                  setIsReviewing(true)
-                  setEditingDeckId(null)
-                }}
-                onDeleteDeck={handleDeleteDeck}
-                settings={settings}
-                decryptedKeys={decryptedKeys}
-                setDecryptedKeys={setDecryptedKeys}
-              />
-            ) : isReviewing ? (
-              <FlashcardReview
-                cards={reviewQueue}
-                decks={decks}
-                settings={settings}
-                onUpdateSetting={handleUpdateSetting}
-                decryptedKeys={decryptedKeys}
-                setDecryptedKeys={setDecryptedKeys}
-                onClose={() => setIsReviewing(false)}
-                onReviewCard={(cardId, rating, reviewDuration, aiEvaluation, userAnswer) => {
-                  let cardToReview = null
-                  for (const deck of decks) {
-                    const card = deck.cards.find(c => c.id === cardId)
-                    if (card) {
-                      cardToReview = card
-                      break
-                    }
-                  }
-
-                  if (!cardToReview) return
-
-                  const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
-                  newHistoryEntry.reviewDuration = reviewDuration
-                  if (aiEvaluation) newHistoryEntry.aiEvaluation = aiEvaluation
-                  if (userAnswer) newHistoryEntry.userAnswer = userAnswer
-
-                  saveReviewHistoryRecord(newHistoryEntry).catch(err => {
-                    console.error("Failed to save review history to IndexedDB", err)
-                  })
-
-                  setDecks(prevDecks => {
-                    return prevDecks.map(deck => {
-                      const cardIndex = deck.cards.findIndex(c => c.id === cardId)
-                      if (cardIndex === -1) return deck
-
-                      const updatedCards = [...deck.cards]
-                      updatedCards[cardIndex] = {
-                        ...updatedCards[cardIndex],
-                        ...schedulingFields
-                      }
-
-                      return {
-                        ...deck,
-                        cards: updatedCards
-                      }
-                    })
-                  })
-                }}
-              />
-            ) : (
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
               <Dashboard
-                decks={decks}
+                decks={decksWithDueCounts}
                 totalDue={totalReviewsDue}
                 onStartReview={() => {
                   const queue = getReviewQueue(decks, settings, null)
                   setReviewQueue(queue)
-                  setIsReviewing(true)
+                  navigate("/review")
                 }}
+                onBrowseDecks={() => navigate("/decks")}
               />
-            )}
-          </div>
-        </div>
+            }
+          />
+          <Route
+            path="/decks"
+            element={
+              <Decks
+                decks={decksWithDueCounts}
+                editingDeckId={null}
+                onSelectDeck={(id) => navigate(`/deck/${id}`)}
+                onToggleDeckEnabled={toggleDeckEnabled}
+                onCreateNewDeck={handleCreateNewDeck}
+              />
+            }
+          />
+          <Route
+            path="/deck/:deckId"
+            element={
+              <DeckRouteWrapper
+                decks={decks}
+                settings={settings}
+                handleUpdateDeck={handleUpdateDeck}
+                handleAddCardToDeck={handleAddCardToDeck}
+                handleDeleteCardFromDeck={handleDeleteCardFromDeck}
+                handleDeleteDeck={handleDeleteDeck}
+                decryptedKeys={decryptedKeys}
+                setDecryptedKeys={setDecryptedKeys}
+                setReviewQueue={setReviewQueue}
+              />
+            }
+          />
+          <Route
+            path="/review"
+            element={
+              <Review
+                reviewQueue={reviewQueue}
+                decks={decks}
+                settings={settings}
+                handleUpdateSetting={handleUpdateSetting}
+                decryptedKeys={decryptedKeys}
+                setDecryptedKeys={setDecryptedKeys}
+                setDecks={setDecks}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </main>
 
       {/* Settings Bottom-Sliding Modal Drawer */}
@@ -783,5 +762,70 @@ export default function App() {
         </div>
       </footer>
     </div>
+  )
+}
+
+function DeckRouteWrapper({
+  decks,
+  settings,
+  handleUpdateDeck,
+  handleAddCardToDeck,
+  handleDeleteCardFromDeck,
+  handleDeleteDeck,
+  decryptedKeys,
+  setDecryptedKeys,
+  setReviewQueue,
+}: {
+  decks: Deck[]
+  settings: SettingsState
+  handleUpdateDeck: any
+  handleAddCardToDeck: any
+  handleDeleteCardFromDeck: any
+  handleDeleteDeck: any
+  decryptedKeys: any
+  setDecryptedKeys: any
+  setReviewQueue: any
+}) {
+  const { deckId } = useParams<{ deckId: string }>()
+  const navigate = useNavigate()
+  const currentDeck = decks.find(d => d.id === deckId)
+
+  if (!currentDeck) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <DeckViewer
+        currentDeck={currentDeck}
+        onClose={() => navigate("/decks")}
+        onUpdateDeck={handleUpdateDeck}
+        onAddCard={handleAddCardToDeck}
+        onDeleteCard={handleDeleteCardFromDeck}
+        dueCount={getDeckDueCount(currentDeck, settings)}
+        onStartReviewDeck={(id) => {
+          const queue = getReviewQueue(decks, settings, id)
+          setReviewQueue(queue)
+          navigate("/review")
+        }}
+        onDeleteDeck={(id) => {
+          handleDeleteDeck(id)
+          navigate("/decks")
+        }}
+        settings={settings}
+        decryptedKeys={decryptedKeys}
+        setDecryptedKeys={setDecryptedKeys}
+      />
+    </div>
+  )
+}
+
+
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   )
 }

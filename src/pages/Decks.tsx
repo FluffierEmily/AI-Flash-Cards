@@ -1,13 +1,45 @@
 import { useState, useEffect } from "react"
 import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, RefreshCw } from "lucide-react"
-import type { Deck } from "./Deck"
-import { AddFlashcardModal } from "../Flashcard/AddFlashcardModal"
-import { EditFlashcardModal } from "../Flashcard/EditFlashcardModal"
-import type { Flashcard } from "../Flashcard/Flashcard"
-import type { SettingsState } from "../Settings"
-import { generateCards } from "../../lib/aiCardGenerator"
-import { getModelInstance } from "../../lib/ai"
-import { PinDecryptModal } from "../PinDecryptModal"
+import { useNavigate } from "react-router-dom"
+import { DummyDecks } from "../components/Deck/Decks"
+import type { Deck } from "../components/Deck/Deck"
+import { AddFlashcardModal } from "../components/Flashcard/AddFlashcardModal"
+import { EditFlashcardModal } from "../components/Flashcard/EditFlashcardModal"
+import type { Flashcard } from "../components/Flashcard/Flashcard"
+import type { SettingsState } from "../components/Settings"
+import { generateCards } from "../lib/aiCardGenerator"
+import { getModelInstance } from "../lib/ai"
+import { PinDecryptModal } from "../components/PinDecryptModal"
+
+interface DecksPageProps {
+  decks: Deck[]
+  editingDeckId: string | null
+  onSelectDeck: (deckId: string) => void
+  onToggleDeckEnabled: (deckId: string) => void
+  onCreateNewDeck: () => void
+}
+
+export function Decks({
+  decks,
+  editingDeckId,
+  onSelectDeck,
+  onToggleDeckEnabled,
+  onCreateNewDeck
+}: DecksPageProps) {
+  const navigate = useNavigate()
+  return (
+    <div className="max-w-2xl mx-auto w-full">
+      <DummyDecks
+        decks={decks}
+        editingDeckId={editingDeckId}
+        onSelectDeck={onSelectDeck}
+        onToggleDeckEnabled={onToggleDeckEnabled}
+        onCreateNewDeck={onCreateNewDeck}
+        onClose={() => navigate("/dashboard")}
+      />
+    </div>
+  )
+}
 
 interface DeckViewerProps {
   currentDeck: Deck
@@ -321,11 +353,11 @@ export function DeckViewer({
                 onClick={triggerCardGenerationFlow}
                 disabled={isGenerationDisabled}
                 className={`relative overflow-hidden group border rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out active:scale-95 text-muted-foreground hover:text-primary ${isGeneratingCards
-                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                    : isGenerationDisabled
-                      ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
-                      : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
-                  }`}
+                  ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                  : isGenerationDisabled
+                    ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
+                    : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
+                }`}
                 title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
@@ -372,11 +404,11 @@ export function DeckViewer({
                 onClick={triggerCardGenerationFlow}
                 disabled={isGenerationDisabled}
                 className={`relative overflow-hidden group border rounded-xl flex flex-col items-center justify-center w-[120px] h-[120px] transition-all duration-300 ease-out active:scale-95 text-muted-foreground hover:text-primary ${isGeneratingCards
-                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                    : isGenerationDisabled
-                      ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
-                      : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
-                  }`}
+                  ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                  : isGenerationDisabled
+                    ? "border-dashed border-muted-foreground/20 bg-secondary/5 opacity-40 pointer-events-none"
+                    : "border-dashed border-muted-foreground/40 hover:border-primary/50 bg-secondary/15 hover:bg-secondary/35 hover:shadow-lg hover:shadow-primary/5 cursor-pointer"
+                }`}
                 title={currentDeck.title.toLowerCase().includes("deck") ? "Generation disabled because deck title includes 'deck'" : "Generate +X Cards"}
               >
                 {isGeneratingCards && (
