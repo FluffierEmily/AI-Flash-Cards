@@ -229,3 +229,4 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [x] AI hint generator
 - [x] improve spaced repetition algorithm (consider review duration)
 - [ ] EXP progression system (increases deck capacity and max deck count)
+. [ ] import & export functionality
