@@ -17,7 +17,8 @@ import {
   Calendar,
   Layers,
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  Brain
 } from "lucide-react"
 import type { MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
@@ -29,6 +30,7 @@ interface DashboardPageProps {
   totalDue: number
   onStartReview: () => void
   onBrowseDecks: () => void
+  onLearnMore: () => void
 }
 
 interface StatusConfig {
@@ -81,7 +83,8 @@ export function Dashboard({
   decks,
   totalDue,
   onStartReview,
-  onBrowseDecks
+  onBrowseDecks,
+  onLearnMore
 }: DashboardPageProps) {
   const [history, setHistory] = useState<ReviewHistoryRecord[]>([])
 
@@ -286,6 +289,31 @@ export function Dashboard({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Spaced Repetition Algorithm Info Section */}
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="absolute top-0 right-0 h-40 w-40 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary animate-pulse" />
+                <h3 className="font-bold text-base text-foreground font-display">Spaced Repetition</h3>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+                Our custom algorithm schedules your cards in hours instead of days, and dynamically adjusts future intervals by comparing your recall response time against your previous card history.
+              </p>
+            </div>
+            
+            <button
+              onClick={onLearnMore}
+              className="flex items-center justify-center gap-2.5 rounded-2xl bg-secondary/50 border border-border hover:border-primary/40 hover:bg-secondary/85 text-foreground px-5 py-3.5 text-sm font-semibold transition-all duration-200 active:scale-95 shadow-sm cursor-pointer shrink-0"
+            >
+              <span>Learn about the Spaced Repetition Algorithm</span>
+              <ChevronRight className="h-4 w-4 stroke-[2.5]" />
+            </button>
           </div>
         </div>
 

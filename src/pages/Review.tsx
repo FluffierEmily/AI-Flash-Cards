@@ -52,7 +52,7 @@ export function Review({
             recordNewCardReviewed(cardId)
           }
 
-          const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating)
+          const { newHistoryEntry, ...schedulingFields } = calculateNextReview(cardToReview, rating, reviewDuration)
           newHistoryEntry.reviewDuration = reviewDuration
           if (aiEvaluation) newHistoryEntry.aiEvaluation = aiEvaluation
           if (userAnswer) newHistoryEntry.userAnswer = userAnswer

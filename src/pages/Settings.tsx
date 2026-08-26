@@ -12,7 +12,6 @@ import {
   Clock,
   HelpCircle,
   Save,
-  ArrowLeft,
   X
 } from "lucide-react"
 

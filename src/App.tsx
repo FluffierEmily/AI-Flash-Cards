@@ -20,6 +20,7 @@ import { type Deck } from "./components/Deck/Deck"
 import { Dashboard } from "./pages/Dashboard"
 import { Review } from "./pages/Review"
 import { DeckOverview, DeckViewer } from "./pages/DeckOverview"
+import { Documentation } from "./pages/Documentation"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
@@ -656,6 +657,7 @@ function AppContent() {
                   navigate("/review")
                 }}
                 onBrowseDecks={() => navigate("/deck-overview")}
+                onLearnMore={() => navigate("/documentation")}
               />
             }
           />
@@ -700,6 +702,10 @@ function AppContent() {
                 setDecks={setDecks}
               />
             }
+          />
+          <Route
+            path="/documentation"
+            element={<Documentation />}
           />
           <Route
             path="/settings"

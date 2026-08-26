@@ -34,9 +34,13 @@ export function sanitizeFlashcard(card: any): Flashcard {
   if (card.lastReviewed) {
     sanitized.lastReviewed = String(card.lastReviewed)
   }
+  if (typeof card.lastReviewDuration === "number") {
+    sanitized.lastReviewDuration = card.lastReviewDuration
+  }
   if (Array.isArray(card.hints)) {
     sanitized.hints = card.hints.map((h: any) => String(h))
   }
+
   return sanitized;
 }
 

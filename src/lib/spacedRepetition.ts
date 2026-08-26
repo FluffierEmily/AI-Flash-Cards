@@ -17,7 +17,8 @@ export interface LocalReminder {
  */
 export function calculateNextReview(
   card: Flashcard,
-  rating: "again" | "hard" | "good" | "easy"
+  rating: "again" | "hard" | "good" | "easy",
+  reviewDurationSec?: number
 ): {
   interval: number
   repetition: number
@@ -26,6 +27,7 @@ export function calculateNextReview(
   lastReviewed: string
   masteryLevel: MasteryLevel
   newHistoryEntry: ReviewHistoryRecord
+  lastReviewDuration?: number
 } {
   let interval = card.interval || 0
   let repetition = card.repetition || 0
@@ -43,10 +45,33 @@ export function calculateNextReview(
   else if (rating === "good") quality = 4
   else if (rating === "easy") quality = 5
 
+  let deviation = 0
+  let timeMultiplier = 1.0
+  let qualityAdjustment = 0
+
+  if (reviewDurationSec !== undefined) {
+    // Estimate baseline if no previous review duration exists (based on word counts)
+    const baseDuration = card.lastReviewDuration || Math.max(
+      8,
+      Math.min(25, (card.question.split(/\s+/).length + card.answer.split(/\s+/).length) * 0.5 + 5)
+    )
+    deviation = (reviewDurationSec - baseDuration) / baseDuration
+
+    if (deviation < 0) {
+      // Faster response than baseline (improvement): boost interval up to 1.2x
+      timeMultiplier = Math.min(1.2, 1.0 - deviation * 0.3)
+    } else {
+      // Slower response than baseline (regression): penalty interval down to 0.4x
+      timeMultiplier = Math.max(0.4, 1.0 - deviation * 0.6)
+      // Apply quality penalty to ease factor update (max penalty of 1.5)
+      qualityAdjustment = -Math.min(1.5, deviation * 1.0)
+    }
+  }
+
   if (quality < 3) {
     // Failed card (Again)
     repetition = 0
-    interval = 1 // 1 day
+    interval = 4 // 4 hours
     easeFactor = Math.max(1.3, easeFactor - 0.2)
 
     // Mastery level update
@@ -57,25 +82,36 @@ export function calculateNextReview(
     }
   } else {
     // Successful card
+    const adjustedQuality = Math.max(3.0, quality + qualityAdjustment)
+
     if (repetition === 0) {
-      interval = 1 // 1 day
+      if (rating === "hard") interval = 8 // 8 hours
+      else if (rating === "good") interval = 24 // 24 hours
+      else interval = 48 // easy: 48 hours
     } else if (repetition === 1) {
-      interval = rating === "easy" ? 3 : 6 // Easy starts with 3 days, Hard/Good with 6 days
+      if (rating === "hard") interval = 24 // 24 hours
+      else if (rating === "good") interval = 96 // 96 hours
+      else interval = 168 // easy: 168 hours
     } else {
       let factor = easeFactor
-      if (rating === "hard") factor *= 0.8 // Hard
-      if (rating === "easy") factor *= 1.3 // Easy
+      if (rating === "hard") factor *= 0.8
+      if (rating === "easy") factor *= 1.3
       interval = Math.max(1, Math.round(interval * factor))
     }
 
-    // Update easeFactor based on quality
-    easeFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+    // Apply the response time multiplier to the successful card interval
+    interval = Math.max(1, Math.round(interval * timeMultiplier))
+
+    // Update easeFactor based on adjustedQuality
+    easeFactor = easeFactor + (0.1 - (5 - adjustedQuality) * (0.08 + (5 - adjustedQuality) * 0.02))
     easeFactor = Math.max(1.3, easeFactor)
 
     repetition += 1
 
     // Mastery level update
-    if (rating === "hard") {
+    const heavyHesitation = reviewDurationSec !== undefined && deviation > 1.0
+
+    if (rating === "hard" || heavyHesitation) {
       masteryLevel = "learning"
     } else if (rating === "good") {
       if (repetition >= 3) {
@@ -96,7 +132,7 @@ export function calculateNextReview(
   const lastReviewed = now.toISOString()
 
   const nextReview = new Date(now)
-  nextReview.setDate(nextReview.getDate() + interval)
+  nextReview.setHours(nextReview.getHours() + interval)
   const nextReviewDate = nextReview.toISOString()
 
   // Construct history entry
@@ -107,7 +143,8 @@ export function calculateNextReview(
     rating,
     easeFactor: prevEaseFactor,
     interval: prevInterval,
-    masteryLevel
+    masteryLevel,
+    reviewDuration: reviewDurationSec
   }
 
   return {
@@ -117,7 +154,8 @@ export function calculateNextReview(
     nextReviewDate,
     lastReviewed,
     masteryLevel,
-    newHistoryEntry: historyEntry
+    newHistoryEntry: historyEntry,
+    lastReviewDuration: reviewDurationSec
   }
 }
 

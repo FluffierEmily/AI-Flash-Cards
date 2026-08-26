@@ -227,5 +227,5 @@ Check the terminal window running `firebase emulators:start` to verify the execu
 - [ ] Design statistics and progress tracking dashboards.
 - [x] AI deck builder
 - [x] AI hint generator
-- [ ] improve spaced repetition algorithm (consider review duration)
+- [x] improve spaced repetition algorithm (consider review duration)
 - [ ] EXP progression system (increases deck capacity and max deck count)

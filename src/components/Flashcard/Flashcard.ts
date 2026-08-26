@@ -31,4 +31,5 @@ export type Flashcard = {
     nextReviewDate?: string
     lastReviewed?: string
     hints?: string[]
+    lastReviewDuration?: number
 }
