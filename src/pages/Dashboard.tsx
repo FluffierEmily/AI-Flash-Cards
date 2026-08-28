@@ -22,7 +22,7 @@ import type { Deck } from "../components/Deck/Deck"
 import { getAllReviewHistory } from "../lib/historyStorage"
 import { getDashboardStats } from "../lib/statistics"
 import { FullscreenGraphModal } from "../components/modals/FullscreenGraphModal"
-import { ReviewsGraph, MasteryGraph, SpeedGrowthGraph, STATUS_METADATA } from "../components/Graphs"
+import { ReviewsGraph, MasteryGraph, SpeedGrowthGraph, ReviewHeatmapCalendar, STATUS_METADATA } from "../components/Graphs"
 
 interface DashboardPageProps {
   decks: Deck[]
@@ -72,8 +72,11 @@ export function Dashboard({
   // Selected interval state for speed growth history ("days" | "weeks" | "months")
   const [selectedSpeedGrowthInterval, setSelectedSpeedGrowthInterval] = useState<"days" | "weeks" | "months">("days")
 
+  // Selected range for review heatmap calendar ("3M" | "6M" | "1Y")
+  const [selectedHeatmapRange, setSelectedHeatmapRange] = useState<"3M" | "6M" | "1Y">("3M")
+
   // Fullscreen modal state for graphs
-  const [activeFullscreenGraph, setActiveFullscreenGraph] = useState<"reviews" | "mastery" | "speedGrowth" | null>(null)
+  const [activeFullscreenGraph, setActiveFullscreenGraph] = useState<"reviews" | "mastery" | "speedGrowth" | "heatmap" | null>(null)
 
   const toggleStatusVisibility = (statusKey: MasteryLevel) => {
     setVisibleStatus(prev => ({
@@ -373,100 +376,150 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Section 3: Speed Growth Analytics */}
-      <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500 shrink-0">
-              <Zap className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base text-foreground font-display">Speed Growth</h3>
-                <div className="relative group leading-none">
-                  <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-xs p-3 rounded-xl shadow-lg z-30 pointer-events-none w-72 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-200">
-                    Calculates how your review speed grows across history relative to the previous review of each card, averaged across all reviews on a given day, week, or month.
+      {/* Row 2: Speed Growth Analytics & Review Heatmap Calendar */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chart 3: Speed Growth Analytics */}
+        <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500 shrink-0">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-foreground font-display">Speed Growth</h3>
+                  <div className="relative group leading-none">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-xs p-3 rounded-xl shadow-lg z-30 pointer-events-none w-72 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-200">
+                      Calculates how your review speed grows across history relative to the previous review of each card, averaged across all reviews on a given day, week, or month.
+                    </div>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Acceleration in recall speed across review sessions
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Acceleration in recall speed across review sessions
-              </p>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              {/* Interval selector */}
+              <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
+                {(["days", "weeks", "months"] as const).map((interval) => (
+                  <button
+                    key={interval}
+                    onClick={() => setSelectedSpeedGrowthInterval(interval)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${
+                      selectedSpeedGrowthInterval === interval
+                        ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {interval}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fullscreen Button */}
+              <button
+                onClick={() => setActiveFullscreenGraph("speedGrowth")}
+                className="p-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer"
+                title="View in Fullscreen"
+                aria-label="View Speed Growth graph in fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            {/* Interval selector */}
-            <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
-              {(["days", "weeks", "months"] as const).map((interval) => (
-                <button
-                  key={interval}
-                  onClick={() => setSelectedSpeedGrowthInterval(interval)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${
-                    selectedSpeedGrowthInterval === interval
-                      ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {interval}
-                </button>
-              ))}
+          {/* Speed Summary Badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Avg Speed Growth</span>
+              <span
+                className={`text-sm font-bold font-display ${
+                  stats.avgSpeedGrowth > 0
+                    ? "text-emerald-500"
+                    : stats.avgSpeedGrowth < 0
+                      ? "text-rose-500"
+                      : "text-foreground"
+                }`}
+              >
+                {stats.avgSpeedGrowth > 0 ? `+${stats.avgSpeedGrowth}%` : `${stats.avgSpeedGrowth}%`}
+              </span>
             </div>
 
-            {/* Fullscreen Button */}
-            <button
-              onClick={() => setActiveFullscreenGraph("speedGrowth")}
-              className="p-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer"
-              title="View in Fullscreen"
-              aria-label="View Speed Growth graph in fullscreen"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
+            <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Avg Response Time</span>
+              <span className="text-sm font-bold text-foreground font-display">
+                {stats.avgReviewDuration > 0 ? `${stats.avgReviewDuration}s` : "—"}
+              </span>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Recall Velocity</span>
+              <span className="text-sm font-bold text-cyan-500 font-display">
+                {stats.avgReviewDuration > 0
+                  ? `${Math.round((60 / stats.avgReviewDuration) * 10) / 10} cards/min`
+                  : "—"}
+              </span>
+            </div>
+          </div>
+
+          <div className="h-[290px] w-full pt-1">
+            <SpeedGrowthGraph
+              data={stats.graphs.speedGrowth[selectedSpeedGrowthInterval]}
+              interval={selectedSpeedGrowthInterval}
+              enableInteractions={true}
+              showInteractionControls={false}
+            />
           </div>
         </div>
 
-        {/* Speed Summary Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">Avg Speed Growth</span>
-            <span
-              className={`text-sm font-bold font-display ${
-                stats.avgSpeedGrowth > 0
-                  ? "text-emerald-500"
-                  : stats.avgSpeedGrowth < 0
-                    ? "text-rose-500"
-                    : "text-foreground"
-              }`}
-            >
-              {stats.avgSpeedGrowth > 0 ? `+${stats.avgSpeedGrowth}%` : `${stats.avgSpeedGrowth}%`}
-            </span>
+        {/* Chart 4: Review Heatmap Calendar */}
+        <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-foreground font-display">Review Heatmap</h3>
+                  <div className="relative group leading-none">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-xs p-3 rounded-xl shadow-lg z-30 pointer-events-none w-72 leading-relaxed animate-in fade-in slide-in-from-bottom-1 duration-200">
+                      Visualizes daily review volume, consistency, and active study days across history. Hover on any day to see details.
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Daily review consistency & practice frequency
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              {/* Fullscreen Button */}
+              <button
+                onClick={() => setActiveFullscreenGraph("heatmap")}
+                className="p-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer"
+                title="View in Fullscreen"
+                aria-label="View Review Heatmap calendar in fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">Avg Response Time</span>
-            <span className="text-sm font-bold text-foreground font-display">
-              {stats.avgReviewDuration > 0 ? `${stats.avgReviewDuration}s` : "—"}
-            </span>
+          <div className="flex-1 w-full min-h-[350px] flex flex-col justify-between pt-1">
+            <ReviewHeatmapCalendar
+              history={history}
+              range={selectedHeatmapRange}
+              onRangeChange={setSelectedHeatmapRange}
+              showControls={true}
+              showSummaryBadges={true}
+            />
           </div>
-
-          <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">Recall Velocity</span>
-            <span className="text-sm font-bold text-cyan-500 font-display">
-              {stats.avgReviewDuration > 0
-                ? `${Math.round((60 / stats.avgReviewDuration) * 10) / 10} cards/min`
-                : "—"}
-            </span>
-          </div>
-        </div>
-
-        <div className="h-[290px] w-full pt-1">
-          <SpeedGrowthGraph
-            data={stats.graphs.speedGrowth[selectedSpeedGrowthInterval]}
-            interval={selectedSpeedGrowthInterval}
-            enableInteractions={true}
-            showInteractionControls={false}
-          />
         </div>
       </div>
 
@@ -481,16 +534,20 @@ export function Dashboard({
               ? "Mastery Progression"
               : activeFullscreenGraph === "speedGrowth"
                 ? "Review Speed Growth"
-                : ""
+                : activeFullscreenGraph === "heatmap"
+                  ? "Review Activity Heatmap"
+                  : ""
         }
         icon={
           activeFullscreenGraph === "reviews" ? (
             <CheckCircle2 className="h-5 w-5" />
           ) : activeFullscreenGraph === "mastery" ? (
             <Layers className="h-5 w-5" />
-          ) : (
+          ) : activeFullscreenGraph === "speedGrowth" ? (
             <Zap className="h-5 w-5 text-cyan-500" />
-          )
+          ) : activeFullscreenGraph === "heatmap" ? (
+            <Calendar className="h-5 w-5 text-emerald-500" />
+          ) : null
         }
         actions={
           activeFullscreenGraph === "reviews" ? (
@@ -538,6 +595,21 @@ export function Dashboard({
                 </button>
               ))}
             </div>
+          ) : activeFullscreenGraph === "heatmap" ? (
+            <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
+              {(["3M", "6M", "1Y"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setSelectedHeatmapRange(r)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${selectedHeatmapRange === r
+                    ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           ) : null
         }
       >
@@ -560,6 +632,14 @@ export function Dashboard({
           <SpeedGrowthGraph
             data={stats.graphs.speedGrowth[selectedSpeedGrowthInterval]}
             interval={selectedSpeedGrowthInterval}
+            isFullscreen
+          />
+        )}
+        {activeFullscreenGraph === "heatmap" && (
+          <ReviewHeatmapCalendar
+            history={history}
+            range={selectedHeatmapRange}
+            onRangeChange={setSelectedHeatmapRange}
             isFullscreen
           />
         )}
