@@ -7,7 +7,11 @@ import {
   Key,
   Smartphone,
   Bell,
-  Info
+  Info,
+  Layers,
+  BookOpen,
+  Menu,
+  X
 } from "lucide-react"
 import { HashRouter as Router, Routes, Route, useNavigate, useLocation, useParams, Navigate } from "react-router-dom"
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypto"
@@ -33,6 +37,19 @@ function AppContent() {
 
   const navigate = useNavigate()
   const location = useLocation()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Close mobile menu on desktop screen resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false)
+      }
+    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
 
   // Load decks asynchronously on mount
   useEffect(() => {
@@ -478,15 +495,44 @@ function AppContent() {
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
         <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/20">
-              <Sparkles className="h-5 w-5" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/dashboard")}>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/20">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="relative inline-flex items-center pr-2 md:pr-6">
+                <span className="hidden sm:inline font-display font-bold text-xl tracking-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
+                  AI Flash Cards
+                </span>
+              </div>
             </div>
-            <div className="relative inline-flex items-center pr-6">
-              <span className="font-display font-bold text-xl tracking-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
-                AI Flash Cards
-              </span>
-            </div>
+
+            {/* Desktop Navigation Links */}
+            <nav className="hidden md:flex items-center gap-1.5 border-l border-border pl-6">
+              <button
+                onClick={() => navigate("/deck-overview")}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  location.pathname === "/deck-overview" || location.pathname.startsWith("/deck/")
+                    ? "text-primary font-semibold drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+                    : "text-muted-foreground hover:text-foreground hover:drop-shadow-[0_0_6px_rgba(139,92,246,0.3)]"
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>Decks</span>
+              </button>
+              <div className="w-px h-4 bg-border mx-1" />
+              <button
+                onClick={() => navigate("/documentation")}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  location.pathname === "/documentation"
+                    ? "text-primary font-semibold drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+                    : "text-muted-foreground hover:text-foreground hover:drop-shadow-[0_0_6px_rgba(139,92,246,0.3)]"
+                }`}
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Docs</span>
+              </button>
+            </nav>
           </div>
 
           <nav className="flex items-center gap-2 relative">
@@ -628,7 +674,7 @@ function AppContent() {
               {darkMode ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
             </button>
 
-            {/* Header Settings Button */}
+             {/* Header Settings Button */}
             <button
               onClick={() => navigate("/settings")}
               className={`flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer ${location.pathname === "/settings" ? "ring-2 ring-primary/40 border-primary" : ""
@@ -638,8 +684,55 @@ function AppContent() {
             >
               <SettingsIcon className="h-5 w-5" />
             </button>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              className="flex md:hidden h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95 shadow-sm cursor-pointer"
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </nav>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-md animate-in slide-in-from-top-4 duration-200">
+            <div className="container max-w-6xl mx-auto px-4 py-4 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  navigate("/deck-overview")
+                  setMobileMenuOpen(false)
+                }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all duration-200 cursor-pointer ${
+                  location.pathname === "/deck-overview" || location.pathname.startsWith("/deck/")
+                    ? "text-primary font-semibold drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+                    : "text-muted-foreground hover:text-foreground hover:drop-shadow-[0_0_6px_rgba(139,92,246,0.3)]"
+                }`}
+              >
+                <Layers className="h-5 w-5" />
+                <span>Decks</span>
+              </button>
+              <div className="h-px bg-border/60 my-1" />
+              <button
+                onClick={() => {
+                  navigate("/documentation")
+                  setMobileMenuOpen(false)
+                }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all duration-200 cursor-pointer ${
+                  location.pathname === "/documentation"
+                    ? "text-primary font-semibold drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]"
+                    : "text-muted-foreground hover:text-foreground hover:drop-shadow-[0_0_6px_rgba(139,92,246,0.3)]"
+                }`}
+              >
+                <BookOpen className="h-5 w-5" />
+                <span>Documentation</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -657,7 +750,6 @@ function AppContent() {
                   navigate("/review")
                 }}
                 onBrowseDecks={() => navigate("/deck-overview")}
-                onLearnMore={() => navigate("/documentation")}
               />
             }
           />
