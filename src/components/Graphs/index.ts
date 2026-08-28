@@ -1,4 +1,5 @@
 export * from "./ReviewsGraph"
 export * from "./MasteryGraph"
+export * from "./SpeedGrowthGraph"
 export * from "./GraphNavigationControls"
 export * from "./useGraphNavigation"

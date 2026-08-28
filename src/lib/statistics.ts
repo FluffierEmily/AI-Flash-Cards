@@ -15,6 +15,14 @@ export interface MasteryDataPoint {
   mastered: number
 }
 
+export interface SpeedGrowthDataPoint {
+  label: string
+  growth: number // Growth in % relative to previous review speed (e.g. +15.5%)
+  avgDuration: number // Average duration in seconds
+  avgSpeed: number // Average speed in cards/minute
+  count: number // Number of reviews
+}
+
 export interface DashboardStats {
   streak: number
   maxStreak: number
@@ -24,6 +32,8 @@ export interface DashboardStats {
   masteryRateTotal: number
   timeStudiedMins: number
   timeStudiedAvgMins: number
+  avgSpeedGrowth: number
+  avgReviewDuration: number
   graphs: {
     reviews: {
       days: GraphDataPoint[]
@@ -34,6 +44,11 @@ export interface DashboardStats {
       days: MasteryDataPoint[]
       weeks: MasteryDataPoint[]
       months: MasteryDataPoint[]
+    }
+    speedGrowth: {
+      days: SpeedGrowthDataPoint[]
+      weeks: SpeedGrowthDataPoint[]
+      months: SpeedGrowthDataPoint[]
     }
   }
 }
@@ -71,11 +86,51 @@ export function getDashboardStats(
     allCards.push(...deck.cards)
   }
 
-  // 2. Parse timestamps once for optimization
+  // 2. Parse timestamps and compute durations once for optimization (sorted chronologically)
   const recordsWithDates = records.map(r => ({
     ...r,
-    date: new Date(r.timestamp)
-  }))
+    date: new Date(r.timestamp),
+    duration: r.reviewDuration && r.reviewDuration > 0 ? Math.max(0.5, r.reviewDuration) : 5
+  })).sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  // Calculate speed growth relative to the previous review for each card
+  const cardLastReviewDuration: Record<string, number> = {}
+
+  interface EnrichedReview {
+    date: Date
+    duration: number
+    growth: number
+    hasPrevious: boolean
+  }
+
+  const enrichedReviews: EnrichedReview[] = []
+  let totalGrowthSum = 0
+  let totalGrowthCount = 0
+
+  for (const r of recordsWithDates) {
+    const prevDuration = cardLastReviewDuration[r.cardId]
+    let growth = 0
+    let hasPrevious = false
+
+    if (prevDuration !== undefined && prevDuration > 0) {
+      hasPrevious = true
+      // Speed growth = ((Speed_k - Speed_{k-1}) / Speed_{k-1}) * 100
+      // Since Speed = 1 / duration, this equals ((prevDuration - currDuration) / currDuration) * 100
+      const rawGrowth = ((prevDuration - r.duration) / r.duration) * 100
+      growth = Math.max(-95, Math.min(500, rawGrowth))
+      totalGrowthSum += growth
+      totalGrowthCount++
+    }
+
+    cardLastReviewDuration[r.cardId] = r.duration
+
+    enrichedReviews.push({
+      date: r.date,
+      duration: r.duration,
+      growth,
+      hasPrevious
+    })
+  }
 
   // Group reviews by cardId for fast historical status lookup
   const reviewsByCard: Record<string, typeof recordsWithDates> = {}
@@ -105,6 +160,36 @@ export function getDashboardStats(
       counts[latestLevel]++
     }
     return counts
+  }
+
+  const calculateSpeedGrowthForBucket = (start: Date, end: Date, label: string): SpeedGrowthDataPoint => {
+    const bucketReviews = enrichedReviews.filter(r => r.date >= start && r.date <= end)
+    if (bucketReviews.length === 0) {
+      return {
+        label,
+        growth: 0,
+        avgDuration: 0,
+        avgSpeed: 0,
+        count: 0
+      }
+    }
+
+    const reviewsWithGrowth = bucketReviews.filter(r => r.hasPrevious)
+    const avgGrowth = reviewsWithGrowth.length > 0
+      ? reviewsWithGrowth.reduce((acc, r) => acc + r.growth, 0) / reviewsWithGrowth.length
+      : 0
+
+    const totalDur = bucketReviews.reduce((acc, r) => acc + r.duration, 0)
+    const avgDuration = totalDur / bucketReviews.length
+    const avgSpeed = avgDuration > 0 ? (60 / avgDuration) : 0
+
+    return {
+      label,
+      growth: Math.round(avgGrowth * 10) / 10,
+      avgDuration: Math.round(avgDuration * 10) / 10,
+      avgSpeed: Math.round(avgSpeed * 10) / 10,
+      count: bucketReviews.length
+    }
   }
 
   // 3. Generate Day Ranges (Last 30 Days)
@@ -163,37 +248,46 @@ export function getDashboardStats(
     })
   }
 
-  // Calculate Reviews Done and Mastery Progression for Days
+  // Calculate Reviews Done, Mastery Progression, and Speed Growth for Days
   const reviewsDays: GraphDataPoint[] = []
   const masteryDays: MasteryDataPoint[] = []
+  const speedGrowthDays: SpeedGrowthDataPoint[] = []
   for (const day of daysList) {
     const count = recordsWithDates.filter(r => r.date >= day.start && r.date <= day.end).length
     reviewsDays.push({ label: day.label, count })
 
     const masteryCounts = getMasteryStateAt(day.end)
     masteryDays.push({ label: day.label, ...masteryCounts })
+
+    speedGrowthDays.push(calculateSpeedGrowthForBucket(day.start, day.end, day.label))
   }
 
-  // Calculate Reviews Done and Mastery Progression for Weeks
+  // Calculate Reviews Done, Mastery Progression, and Speed Growth for Weeks
   const reviewsWeeks: GraphDataPoint[] = []
   const masteryWeeks: MasteryDataPoint[] = []
+  const speedGrowthWeeks: SpeedGrowthDataPoint[] = []
   for (const wk of weeksList) {
     const count = recordsWithDates.filter(r => r.date >= wk.start && r.date <= wk.end).length
     reviewsWeeks.push({ label: wk.label, count })
 
     const masteryCounts = getMasteryStateAt(wk.end)
     masteryWeeks.push({ label: wk.label, ...masteryCounts })
+
+    speedGrowthWeeks.push(calculateSpeedGrowthForBucket(wk.start, wk.end, wk.label))
   }
 
-  // Calculate Reviews Done and Mastery Progression for Months
+  // Calculate Reviews Done, Mastery Progression, and Speed Growth for Months
   const reviewsMonths: GraphDataPoint[] = []
   const masteryMonths: MasteryDataPoint[] = []
+  const speedGrowthMonths: SpeedGrowthDataPoint[] = []
   for (const mo of monthsList) {
     const count = recordsWithDates.filter(r => r.date >= mo.start && r.date <= mo.end).length
     reviewsMonths.push({ label: mo.label, count })
 
     const masteryCounts = getMasteryStateAt(mo.end)
     masteryMonths.push({ label: mo.label, ...masteryCounts })
+
+    speedGrowthMonths.push(calculateSpeedGrowthForBucket(mo.start, mo.end, mo.label))
   }
 
   // 6. Calculate Summary Stats
@@ -269,6 +363,10 @@ export function getDashboardStats(
   const timeStudiedMins = Math.round(totalDurationSeconds / 60)
   const timeStudiedAvgMins = reviewDays.size > 0 ? Math.round(timeStudiedMins / reviewDays.size) : 0
 
+  // Speed Growth Summaries
+  const avgSpeedGrowth = totalGrowthCount > 0 ? Math.round((totalGrowthSum / totalGrowthCount) * 10) / 10 : 0
+  const avgReviewDuration = records.length > 0 ? Math.round((totalDurationSeconds / records.length) * 10) / 10 : 0
+
   const result: DashboardStats = {
     streak,
     maxStreak,
@@ -278,6 +376,8 @@ export function getDashboardStats(
     masteryRateTotal,
     timeStudiedMins,
     timeStudiedAvgMins,
+    avgSpeedGrowth,
+    avgReviewDuration,
     graphs: {
       reviews: {
         days: reviewsDays,
@@ -288,6 +388,11 @@ export function getDashboardStats(
         days: masteryDays,
         weeks: masteryWeeks,
         months: masteryMonths
+      },
+      speedGrowth: {
+        days: speedGrowthDays,
+        weeks: speedGrowthWeeks,
+        months: speedGrowthMonths
       }
     }
   }
