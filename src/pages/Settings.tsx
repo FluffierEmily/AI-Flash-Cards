@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Settings as SettingsIcon,
@@ -12,11 +13,17 @@ import {
   Clock,
   HelpCircle,
   Save,
-  X
+  X,
+  Download,
+  Upload,
+  Database
 } from "lucide-react"
 
 import { DEFAULT_EVAL_PROMPT } from "../lib/aiEvaluation"
 import { DEFAULT_HINT_PROMPT } from "../lib/aiHints"
+import type { Deck } from "../components/Deck/Deck"
+import { ExportWizardModal } from "../components/modals/ExportWizardModal"
+import { ImportWizardModal, type ImportSuccessPayload } from "../components/modals/ImportWizardModal"
 
 export interface SettingsState {
   cardShuffle: boolean
@@ -62,6 +69,8 @@ export interface SettingsProps {
   onResetDefaults: () => void
   onOpenDrawerStep?: (step: "apiKey" | "pwa" | "fcm") => void
   onResetData?: () => void
+  decks?: Deck[]
+  onImportData?: (payload: ImportSuccessPayload) => void
 }
 
 function SettingTooltip({ text }: { text: string }) {
@@ -86,9 +95,13 @@ export function Settings({
   onUpdateSetting,
   onResetDefaults,
   onOpenDrawerStep,
-  onResetData
+  onResetData,
+  decks = [],
+  onImportData
 }: SettingsProps) {
   const navigate = useNavigate()
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   return (
     <div className="max-w-3xl mx-auto bg-card border border-border shadow-xl rounded-2xl flex flex-col overflow-hidden animate-in fade-in duration-200">
@@ -451,6 +464,57 @@ export function Settings({
           />
         </div>
 
+        {/* Import / Export Data Section */}
+        <div className="py-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-sm font-semibold text-foreground">
+                Import / Export Data
+              </span>
+              <SettingTooltip text="Backup or transfer your flashcards, decks, review history, and app configuration as a JSON file." />
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Export or restore your collection in JSON format with custom selection of decks, spaced repetition review history, and configuration settings.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsExportModalOpen(true)}
+              className="p-4 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/50 text-foreground transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-xs hover:border-primary/40 text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
+                  <Download className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-foreground">Export Data</div>
+                  <div className="text-[11px] text-muted-foreground truncate">Save decks & history to JSON</div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="p-4 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/50 text-foreground transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-xs hover:border-primary/40 text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
+                  <Upload className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-foreground">Import Data</div>
+                  <div className="text-[11px] text-muted-foreground truncate">Restore from JSON file</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Danger Zone Section */}
         <div className="py-4 space-y-3 bg-destructive/5 -mx-5 md:-mx-7 px-5 md:px-7 rounded-b-xl border-t border-destructive/20">
           <div className="flex items-center gap-2">
@@ -493,6 +557,26 @@ export function Settings({
           Save & Return
         </button>
       </div>
+
+      {/* Export Wizard Modal */}
+      <ExportWizardModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        decks={decks}
+        settings={settings}
+      />
+
+      {/* Import Wizard Modal */}
+      <ImportWizardModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        existingDecks={decks}
+        onImportSuccess={(payload) => {
+          if (onImportData) {
+            onImportData(payload)
+          }
+        }}
+      />
     </div>
   )
 }

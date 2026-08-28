@@ -223,6 +223,17 @@ function AppContent() {
     }
   }
 
+  const handleImportData = (payload: {
+    importedDecks: Deck[]
+    importedSettings?: SettingsState
+    importedReviewCount: number
+  }) => {
+    setDecks(payload.importedDecks)
+    if (payload.importedSettings) {
+      setSettings(payload.importedSettings)
+    }
+  }
+
   // Setup Drawer State
   const [activeDrawerStep, setActiveDrawerStep] = useState<"apiKey" | "pwa" | "fcm" | null>(null)
 
@@ -808,6 +819,8 @@ function AppContent() {
                 onResetDefaults={handleResetSettings}
                 onOpenDrawerStep={(step) => setActiveDrawerStep(step)}
                 onResetData={handleResetData}
+                decks={decks}
+                onImportData={handleImportData}
               />
             }
           />

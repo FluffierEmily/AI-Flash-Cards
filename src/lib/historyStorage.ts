@@ -85,6 +85,25 @@ export async function getAllReviewHistory(): Promise<ReviewHistoryRecord[]> {
 }
 
 /**
+ * Saves multiple review history records in a single readwrite transaction.
+ */
+export async function saveReviewHistoryBatch(records: ReviewHistoryRecord[]): Promise<void> {
+  if (!records || records.length === 0) return
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("review_history", "readwrite")
+    const store = tx.objectStore("review_history")
+    
+    for (const record of records) {
+      store.put(record)
+    }
+
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+/**
  * Deletes all review history records.
  */
 export async function clearAllReviewHistory(): Promise<void> {
@@ -97,4 +116,5 @@ export async function clearAllReviewHistory(): Promise<void> {
     request.onerror = () => reject(request.error)
   })
 }
+
 
