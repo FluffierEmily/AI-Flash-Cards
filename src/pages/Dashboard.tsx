@@ -1,14 +1,5 @@
 import { useState, useEffect } from "react"
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts"
-import {
   Play,
   CheckCircle2,
   TrendingUp,
@@ -18,76 +9,32 @@ import {
   Layers,
   ChevronRight,
   HelpCircle,
-  Sparkles,
   Flame,
   AlertTriangle,
   Trophy,
   Hourglass,
-  Dumbbell
+  Dumbbell,
+  Maximize2
 } from "lucide-react"
 import type { MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
 import { getAllReviewHistory } from "../lib/historyStorage"
 import { getDashboardStats } from "../lib/statistics"
+import { FullscreenGraphModal } from "../components/modals/FullscreenGraphModal"
+import { ReviewsGraph, MasteryGraph, STATUS_METADATA } from "../components/Graphs"
 
 interface DashboardPageProps {
   decks: Deck[]
   totalDue: number
   onStartReview: () => void
-  onBrowseDecks: () => void
+  onBrowseDecks?: () => void
 }
 
-interface StatusConfig {
-  key: MasteryLevel
-  label: string
-  color: string
-  borderColor: string
-  bgColor: string
-}
-
-const STATUS_METADATA: StatusConfig[] = [
-  {
-    key: "weakness",
-    label: "Weakness",
-    color: "#f43f5e", // Rose 500
-    borderColor: "border-rose-500/30",
-    bgColor: "bg-rose-500/10"
-  },
-  {
-    key: "slipUp",
-    label: "Slip-up",
-    color: "#f59e0b", // Amber 500
-    borderColor: "border-amber-500/30",
-    bgColor: "bg-amber-500/10"
-  },
-  {
-    key: "learning",
-    label: "Learning",
-    color: "#3b82f6", // Blue 500
-    borderColor: "border-blue-500/30",
-    bgColor: "bg-blue-500/10"
-  },
-  {
-    key: "proficient",
-    label: "Proficient",
-    color: "#8b5cf6", // Violet 500
-    borderColor: "border-violet-500/30",
-    bgColor: "bg-violet-500/10"
-  },
-  {
-    key: "mastered",
-    label: "Mastered",
-    color: "#10b981", // Emerald 500
-    borderColor: "border-emerald-500/30",
-    bgColor: "bg-emerald-500/10"
-  }
-]
 
 export function Dashboard({
   decks,
   totalDue,
-  onStartReview,
-  onBrowseDecks
+  onStartReview
 }: DashboardPageProps) {
   const [history, setHistory] = useState<ReviewHistoryRecord[]>([])
 
@@ -121,15 +68,15 @@ export function Dashboard({
   // Selected interval state for mastery progression history ("days" | "weeks" | "months")
   const [selectedMasteryInterval, setSelectedMasteryInterval] = useState<"days" | "weeks" | "months">("days")
 
+  // Fullscreen modal state for graphs
+  const [activeFullscreenGraph, setActiveFullscreenGraph] = useState<"reviews" | "mastery" | null>(null)
+
   const toggleStatusVisibility = (statusKey: MasteryLevel) => {
     setVisibleStatus(prev => ({
       ...prev,
       [statusKey]: !prev[statusKey]
     }))
   }
-
-  // Helper to check if any status line is visible
-  const hasVisibleMasteryLines = Object.values(visibleStatus).some(Boolean)
 
   return (
     <div className="space-y-6">
@@ -170,9 +117,8 @@ export function Dashboard({
               <button
                 onClick={onStartReview}
                 disabled={totalDue === 0}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 px-6 py-3 sm:py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 hover:scale-[1.02] transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer group ${
-                  totalDue > 0 ? "animate-glow-pulse" : "shadow-md shadow-primary/25"
-                }`}
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 px-6 py-3 sm:py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 hover:scale-[1.02] transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer group ${totalDue > 0 ? "animate-glow-pulse" : "shadow-md shadow-primary/25"
+                  }`}
               >
                 <Play className="h-4.5 w-4.5 fill-current group-hover:scale-110 transition-transform duration-200" />
                 <span>Start Reviewing</span>
@@ -335,7 +281,114 @@ export function Dashboard({
               <h3 className="font-bold text-base text-foreground font-display">Reviews Done</h3>
             </div>
 
-            {/* Interval selector */}
+            <div className="flex items-center gap-2">
+              {/* Interval selector */}
+              <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
+                {(["days", "weeks", "months"] as const).map((interval) => (
+                  <button
+                    key={interval}
+                    onClick={() => setSelectedReviewsInterval(interval)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${selectedReviewsInterval === interval
+                      ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    {interval}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fullscreen Button */}
+              <button
+                onClick={() => setActiveFullscreenGraph("reviews")}
+                className="p-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer"
+                title="View in Fullscreen"
+                aria-label="View Reviews Done graph in fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="h-[290px] w-full pt-1">
+            <ReviewsGraph
+              data={stats.graphs.reviews[selectedReviewsInterval]}
+              interval={selectedReviewsInterval}
+              enableInteractions={true}
+              showInteractionControls={false}
+            />
+          </div>
+        </div>
+
+        {/* Chart 2: Card Mastery Over Time */}
+        <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="space-y-1">
+              <h3 className="font-bold text-base text-foreground font-display">Mastery Progression</h3>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              {/* Interval selector */}
+              <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
+                {(["days", "weeks", "months"] as const).map((interval) => (
+                  <button
+                    key={interval}
+                    onClick={() => setSelectedMasteryInterval(interval)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${selectedMasteryInterval === interval
+                      ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    {interval}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fullscreen Button */}
+              <button
+                onClick={() => setActiveFullscreenGraph("mastery")}
+                className="p-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer"
+                title="View in Fullscreen"
+                aria-label="View Mastery Progression graph in fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="min-h-[300px] w-full pt-1 flex-1">
+            <MasteryGraph
+              data={stats.graphs.mastery[selectedMasteryInterval]}
+              visibleStatus={visibleStatus}
+              onToggleStatus={toggleStatusVisibility}
+              interval={selectedMasteryInterval}
+              enableInteractions={true}
+              showInteractionControls={false}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen Graph Modal */}
+      <FullscreenGraphModal
+        isOpen={activeFullscreenGraph !== null}
+        onClose={() => setActiveFullscreenGraph(null)}
+        title={
+          activeFullscreenGraph === "reviews"
+            ? "Reviews Done"
+            : activeFullscreenGraph === "mastery"
+              ? "Mastery Progression"
+              : ""
+        }
+        icon={
+          activeFullscreenGraph === "reviews" ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <Layers className="h-5 w-5" />
+          )
+        }
+        actions={
+          activeFullscreenGraph === "reviews" ? (
             <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
               {(["days", "weeks", "months"] as const).map((interval) => (
                 <button
@@ -350,61 +403,8 @@ export function Dashboard({
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="h-[240px] w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats.graphs.reviews[selectedReviewsInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.6} />
-                <XAxis
-                  dataKey="label"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    fontSize: "12px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
-                  }}
-                  itemStyle={{ color: "hsl(var(--primary))" }}
-                  labelStyle={{ fontWeight: "bold", color: "hsl(var(--foreground))" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Reviews Completed"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, stroke: "hsl(var(--card))", strokeWidth: 1.5, fill: "hsl(var(--primary))" }}
-                  activeDot={{ r: 6 }}
-                  animationDuration={600}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Chart 2: Card Mastery Over Time */}
-        <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <div className="space-y-1">
-              <h3 className="font-bold text-base text-foreground font-display">Mastery Progression</h3>
-            </div>
-
-            {/* Interval selector */}
-            <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0 self-start sm:self-center">
+          ) : activeFullscreenGraph === "mastery" ? (
+            <div className="flex rounded-lg border border-border bg-secondary/50 p-0.5 shrink-0">
               {(["days", "weeks", "months"] as const).map((interval) => (
                 <button
                   key={interval}
@@ -418,88 +418,26 @@ export function Dashboard({
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Interactive Checkbox Legend Grid */}
-          <div className="flex flex-wrap gap-2">
-            {STATUS_METADATA.map((status) => {
-              const isVisible = visibleStatus[status.key]
-              return (
-                <button
-                  key={status.key}
-                  onClick={() => toggleStatusVisibility(status.key)}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-200 cursor-pointer ${isVisible
-                    ? `${status.bgColor} ${status.borderColor}`
-                    : "bg-secondary text-muted-foreground border-transparent opacity-60 hover:opacity-85"
-                    }`}
-                  style={{ color: isVisible ? status.color : undefined }}
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-md border shrink-0 transition-all duration-200"
-                    style={{
-                      backgroundColor: isVisible ? status.color : "transparent",
-                      borderColor: isVisible ? status.color : "currentColor"
-                    }}
-                  />
-                  {status.label}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="h-[240px] w-full pt-2 relative">
-            {!hasVisibleMasteryLines && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/85 backdrop-blur-[1px] z-10 rounded-2xl">
-                <Info className="h-6 w-6 text-muted-foreground mb-2 animate-bounce" />
-                <p className="text-xs font-semibold text-muted-foreground">Select at least one status level to show lines</p>
-              </div>
-            )}
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={stats.graphs.mastery[selectedMasteryInterval]} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.6} />
-                <XAxis
-                  dataKey="label"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    fontSize: "12px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
-                  }}
-                  labelStyle={{ fontWeight: "bold", color: "hsl(var(--foreground))" }}
-                />
-                {STATUS_METADATA.map((status) => (
-                  <Line
-                    key={status.key}
-                    type="monotone"
-                    dataKey={status.key === "slipUp" ? "slipUp" : status.key}
-                    name={status.label}
-                    stroke={status.color}
-                    strokeWidth={2.2}
-                    hide={!visibleStatus[status.key]}
-                    dot={{ r: 3.5, stroke: "transparent", fill: status.color }}
-                    activeDot={{ r: 5 }}
-                    animationDuration={600}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+          ) : null
+        }
+      >
+        {activeFullscreenGraph === "reviews" && (
+          <ReviewsGraph
+            data={stats.graphs.reviews[selectedReviewsInterval]}
+            interval={selectedReviewsInterval}
+            isFullscreen
+          />
+        )}
+        {activeFullscreenGraph === "mastery" && (
+          <MasteryGraph
+            data={stats.graphs.mastery[selectedMasteryInterval]}
+            visibleStatus={visibleStatus}
+            onToggleStatus={toggleStatusVisibility}
+            isFullscreen
+          />
+        )}
+      </FullscreenGraphModal>
     </div>
   )
 }
+

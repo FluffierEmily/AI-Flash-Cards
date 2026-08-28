@@ -107,25 +107,27 @@ export function getDashboardStats(
     return counts
   }
 
-  // 3. Generate Day Ranges (Last 7 Days)
+  // 3. Generate Day Ranges (Last 30 Days)
   const daysList: { label: string; start: Date; end: Date }[] = []
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-  for (let i = 6; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     
     const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
     const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+    // Label format: "Mon 28" or "8/28"
+    const label = i < 7 ? dayNames[d.getDay()] : `${d.getMonth() + 1}/${d.getDate()}`
     daysList.push({
-      label: dayNames[d.getDay()],
+      label,
       start,
       end
     })
   }
 
-  // 4. Generate Week Ranges (Last 4 Weeks)
+  // 4. Generate Week Ranges (Last 16 Weeks)
   const weeksList: { label: string; start: Date; end: Date }[] = []
-  for (let i = 3; i >= 0; i--) {
+  for (let i = 15; i >= 0; i--) {
     const start = new Date()
     start.setDate(start.getDate() - (i * 7 + 6))
     start.setHours(0, 0, 0, 0)
@@ -134,25 +136,28 @@ export function getDashboardStats(
     end.setDate(end.getDate() - (i * 7))
     end.setHours(23, 59, 59, 999)
 
+    const label = i === 0 ? "Current" : i < 4 ? `Wk ${4 - i}` : `${start.getMonth() + 1}/${start.getDate()}`
     weeksList.push({
-      label: `Week ${4 - i}`,
+      label,
       start,
       end
     })
   }
 
-  // 5. Generate Month Ranges (Last 6 Months)
+  // 5. Generate Month Ranges (Last 18 Months)
   const monthsList: { label: string; start: Date; end: Date }[] = []
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  for (let i = 5; i >= 0; i--) {
+  const currentYear = new Date().getFullYear()
+  for (let i = 17; i >= 0; i--) {
     const d = new Date()
     d.setMonth(d.getMonth() - i)
 
     const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0)
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
 
+    const yearSuffix = start.getFullYear() !== currentYear ? ` '${String(start.getFullYear()).slice(2)}` : ""
     monthsList.push({
-      label: monthNames[start.getMonth()],
+      label: `${monthNames[start.getMonth()]}${yearSuffix}`,
       start,
       end
     })
