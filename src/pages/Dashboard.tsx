@@ -18,7 +18,12 @@ import {
   Layers,
   ChevronRight,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Flame,
+  AlertTriangle,
+  Trophy,
+  Hourglass,
+  Dumbbell
 } from "lucide-react"
 import type { MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
@@ -188,7 +193,14 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">{stats.streak} Days</span>
+            <div className="flex items-center gap-2">
+              {stats.streak === 0 ? (
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+              ) : (
+                <Flame className="h-5 w-5 text-orange-500 shrink-0" />
+              )}
+              <span className="text-2xl font-bold text-foreground font-display">{stats.streak} Days</span>
+            </div>
             <span className="block text-[10px] text-muted-foreground mt-0.5">Top streak: {stats.maxStreak} days</span>
           </div>
         </div>
@@ -201,7 +213,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">{stats.reviewsDoneTotal}</span>
+            <div className="flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-primary shrink-0" />
+              <span className="text-2xl font-bold text-foreground font-display">{stats.reviewsDoneTotal}</span>
+            </div>
             <span className="block text-[10px] text-muted-foreground mt-0.5">Last 7 days: +{stats.reviewsDoneLast7Days} reviews</span>
           </div>
         </div>
@@ -214,7 +229,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">{stats.masteryRateMastered} / {stats.masteryRateTotal}</span>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-emerald-500 shrink-0" />
+              <span className="text-2xl font-bold text-foreground font-display">{stats.masteryRateMastered} / {stats.masteryRateTotal}</span>
+            </div>
             <span className="block text-[10px] text-muted-foreground mt-0.5">
               {stats.masteryRateTotal > 0 ? Math.round((stats.masteryRateMastered / stats.masteryRateTotal) * 100) : 0}% of your catalog mastered
             </span>
@@ -229,7 +247,10 @@ export function Dashboard({
             </div>
           </div>
           <div>
-            <span className="text-2xl font-bold text-foreground font-display">{stats.timeStudiedMins} mins</span>
+            <div className="flex items-center gap-2">
+              <Hourglass className="h-5 w-5 text-blue-500 shrink-0" />
+              <span className="text-2xl font-bold text-foreground font-display">{stats.timeStudiedMins} mins</span>
+            </div>
             <span className="block text-[10px] text-muted-foreground mt-0.5">Avg: {stats.timeStudiedAvgMins} mins per study day</span>
           </div>
         </div>
