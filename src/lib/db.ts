@@ -1,7 +1,7 @@
 import type { EncryptedPayload } from "./crypto"
 
 const DB_NAME = "ai_flash_cards_db"
-const DB_VERSION = 5
+const DB_VERSION = 6
 const STORE_NAME = "settings"
 
 export function openDB(): Promise<IDBDatabase> {
@@ -14,22 +14,34 @@ export function openDB(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_NAME)
       }
 
-      // Upgrade decks store to use keyPath "id"
-      if (db.objectStoreNames.contains("decks")) {
-        db.deleteObjectStore("decks")
+      // Upgrade decks store to use keyPath "id" if not existing
+      if (!db.objectStoreNames.contains("decks")) {
+        db.createObjectStore("decks", { keyPath: "id" })
       }
-      db.createObjectStore("decks", { keyPath: "id" })
 
-      // Recreate review_history store with compound keyPath ["cardId", "timestamp"]
-      if (db.objectStoreNames.contains("review_history")) {
-        db.deleteObjectStore("review_history")
+      // Ensure review_history store exists with compound keyPath ["cardId", "timestamp"]
+      let historyStore: IDBObjectStore
+      if (!db.objectStoreNames.contains("review_history")) {
+        historyStore = db.createObjectStore("review_history", { keyPath: ["cardId", "timestamp"] })
+      } else {
+        historyStore = (event.target as IDBOpenDBRequest).transaction!.objectStore("review_history")
       }
-      const historyStore = db.createObjectStore("review_history", { keyPath: ["cardId", "timestamp"] })
-      historyStore.createIndex("deckId", "deckId", { unique: false })
-      historyStore.createIndex("cardId", "cardId", { unique: false })
-      historyStore.createIndex("timestamp", "timestamp", { unique: false })
-      historyStore.createIndex("deckId_timestamp", ["deckId", "timestamp"], { unique: false })
-      historyStore.createIndex("cardId_timestamp", ["cardId", "timestamp"], { unique: false })
+
+      if (!historyStore.indexNames.contains("deckId")) {
+        historyStore.createIndex("deckId", "deckId", { unique: false })
+      }
+      if (!historyStore.indexNames.contains("cardId")) {
+        historyStore.createIndex("cardId", "cardId", { unique: false })
+      }
+      if (!historyStore.indexNames.contains("timestamp")) {
+        historyStore.createIndex("timestamp", "timestamp", { unique: false })
+      }
+      if (!historyStore.indexNames.contains("deckId_timestamp")) {
+        historyStore.createIndex("deckId_timestamp", ["deckId", "timestamp"], { unique: false })
+      }
+      if (!historyStore.indexNames.contains("cardId_timestamp")) {
+        historyStore.createIndex("cardId_timestamp", ["cardId", "timestamp"], { unique: false })
+      }
     }
 
     request.onsuccess = () => resolve(request.result)

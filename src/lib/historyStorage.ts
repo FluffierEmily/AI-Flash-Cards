@@ -26,21 +26,40 @@ export async function getReviewsInDateRange(
   return new Promise((resolve, reject) => {
     const tx = db.transaction("review_history", "readonly")
     const store = tx.objectStore("review_history")
-    const index = store.index("timestamp")
-    const range = IDBKeyRange.bound(startDateIso, endDateIso)
-    const request = index.openCursor(range)
 
-    const results: ReviewHistoryRecord[] = []
-    request.onsuccess = (event) => {
-      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
-      if (cursor) {
-        results.push(cursor.value)
-        cursor.continue()
-      } else {
-        resolve(results)
+    if (store.indexNames.contains("timestamp")) {
+      const index = store.index("timestamp")
+      const range = IDBKeyRange.bound(startDateIso, endDateIso)
+      const request = index.openCursor(range)
+
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          results.push(cursor.value)
+          cursor.continue()
+        } else {
+          resolve(results)
+        }
       }
+      request.onerror = () => reject(request.error)
+    } else {
+      const request = store.openCursor()
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          const rec = cursor.value
+          if (rec && rec.timestamp >= startDateIso && rec.timestamp <= endDateIso) {
+            results.push(rec)
+          }
+          cursor.continue()
+        } else {
+          resolve(results)
+        }
+      }
+      request.onerror = () => reject(request.error)
     }
-    request.onerror = () => reject(request.error)
   })
 }
 
@@ -52,20 +71,84 @@ export async function getReviewsForDeck(deckId: string): Promise<ReviewHistoryRe
   return new Promise((resolve, reject) => {
     const tx = db.transaction("review_history", "readonly")
     const store = tx.objectStore("review_history")
-    const index = store.index("deckId")
-    const request = index.openCursor(IDBKeyRange.only(deckId))
 
-    const results: ReviewHistoryRecord[] = []
-    request.onsuccess = (event) => {
-      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
-      if (cursor) {
-        results.push(cursor.value)
-        cursor.continue()
-      } else {
-        resolve(results)
+    if (store.indexNames.contains("deckId")) {
+      const index = store.index("deckId")
+      const request = index.openCursor(IDBKeyRange.only(deckId))
+
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          results.push(cursor.value)
+          cursor.continue()
+        } else {
+          resolve(results)
+        }
       }
+      request.onerror = () => reject(request.error)
+    } else {
+      const request = store.openCursor()
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          if (cursor.value && cursor.value.deckId === deckId) {
+            results.push(cursor.value)
+          }
+          cursor.continue()
+        } else {
+          resolve(results)
+        }
+      }
+      request.onerror = () => reject(request.error)
     }
-    request.onerror = () => reject(request.error)
+  })
+}
+
+/**
+ * Fetches all review history records for a specific card sorted chronologically.
+ */
+export async function getReviewsForCard(cardId: string): Promise<ReviewHistoryRecord[]> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("review_history", "readonly")
+    const store = tx.objectStore("review_history")
+
+    if (store.indexNames.contains("cardId")) {
+      const index = store.index("cardId")
+      const request = index.openCursor(IDBKeyRange.only(cardId))
+
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          results.push(cursor.value)
+          cursor.continue()
+        } else {
+          results.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          resolve(results)
+        }
+      }
+      request.onerror = () => reject(request.error)
+    } else {
+      // Graceful fallback: scan records if index has not been created yet in local storage
+      const request = store.openCursor()
+      const results: ReviewHistoryRecord[] = []
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+        if (cursor) {
+          if (cursor.value && cursor.value.cardId === cardId) {
+            results.push(cursor.value)
+          }
+          cursor.continue()
+        } else {
+          results.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          resolve(results)
+        }
+      }
+      request.onerror = () => reject(request.error)
+    }
   })
 }
 

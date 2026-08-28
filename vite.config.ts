@@ -13,7 +13,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         cleanupOutdatedCaches: true,
-        importScripts: ['/firebase-messaging-sw.js']
+        importScripts: ['/firebase-messaging-sw.js'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
       },
       includeAssets: ['favicon.svg', 'icons.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon-512x512.png'],
       manifest: {

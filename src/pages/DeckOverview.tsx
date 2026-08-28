@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, RefreshCw } from "lucide-react"
+import { Plus, Trash2, Search, X, Pencil, Check, Layers, Play, Sparkles, RefreshCw, TrendingUp } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { DeckList } from "../components/Deck/Decks"
 import type { Deck } from "../components/Deck/Deck"
 import { AddFlashcardModal } from "../components/modals/AddFlashcardModal"
 import { EditFlashcardModal } from "../components/modals/EditFlashcardModal"
+import { CardReviewHistory } from "../components/Flashcard/CardReviewHistory"
 import type { Flashcard } from "../components/Flashcard/Flashcard"
 import type { SettingsState } from "./Settings"
 import { generateCards } from "../lib/aiCardGenerator"
@@ -73,6 +74,7 @@ export function DeckViewer({
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [selectedCardForEdit, setSelectedCardForEdit] = useState<Flashcard | null>(null)
+  const [selectedCardForHistory, setSelectedCardForHistory] = useState<Flashcard | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const [isGeneratingCards, setIsGeneratingCards] = useState(false)
@@ -440,6 +442,16 @@ export function DeckViewer({
                   onClick={() => setSelectedCardForEdit(card)}
                   className="relative group border border-white/10 bg-gradient-to-br from-purple-800/50 to-neutral-800 rounded-xl p-3 flex flex-col items-center justify-center text-center w-[120px] h-[120px] transition-all duration-300 ease-out hover:border-primary/40 hover:shadow-lg hover:shadow-primary/20 shadow-md shadow-black/35 cursor-pointer active:scale-95"
                 >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedCardForHistory(card)
+                    }}
+                    className="absolute top-1.5 left-1.5 text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/20 transition-colors cursor-pointer shrink-0 z-10"
+                    title="Review History"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  </button>
                   <span className="font-semibold text-xs text-white line-clamp-3 break-words w-full px-1 block">
                     {card.question}
                   </span>
@@ -495,6 +507,14 @@ export function DeckViewer({
         settings={settings}
         decryptedKeys={decryptedKeys}
         setDecryptedKeys={setDecryptedKeys}
+      />
+
+      {/* Card Review History Modal */}
+      <CardReviewHistory
+        isOpen={selectedCardForHistory !== null}
+        onClose={() => setSelectedCardForHistory(null)}
+        card={selectedCardForHistory ? currentDeck.cards.find(c => c.id === selectedCardForHistory.id) || selectedCardForHistory : null}
+        deckTitle={currentDeck.title}
       />
 
       {/* Generate +10 Cards Confirmation Modal */}

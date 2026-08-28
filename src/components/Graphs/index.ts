@@ -1,6 +1,7 @@
 export * from "./ReviewsGraph"
 export * from "./MasteryGraph"
 export * from "./SpeedGrowthGraph"
+export * from "./CardReviewSpeedGraph"
 export * from "./ReviewHeatmapCalendar"
 export * from "./GraphNavigationControls"
 export * from "./useGraphNavigation"
