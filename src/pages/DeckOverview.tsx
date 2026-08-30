@@ -6,6 +6,7 @@ import type { Deck } from "../components/Deck/Deck"
 import { AddFlashcardModal } from "../components/modals/AddFlashcardModal"
 import { EditFlashcardModal } from "../components/modals/EditFlashcardModal"
 import { CardReviewHistory } from "../components/Flashcard/CardReviewHistory"
+import { ImportWizardModal } from "../components/modals/ImportWizardModal"
 import type { Flashcard } from "../components/Flashcard/Flashcard"
 import type { SettingsState } from "./Settings"
 import { generateCards } from "../lib/aiCardGenerator"
@@ -18,6 +19,7 @@ interface DeckOverviewPageProps {
   onSelectDeck: (deckId: string) => void
   onToggleDeckEnabled: (deckId: string) => void
   onCreateNewDeck: () => void
+  onImportDecks?: (importedDecks: Deck[]) => void
 }
 
 export function DeckOverview({
@@ -25,9 +27,12 @@ export function DeckOverview({
   editingDeckId,
   onSelectDeck,
   onToggleDeckEnabled,
-  onCreateNewDeck
+  onCreateNewDeck,
+  onImportDecks
 }: DeckOverviewPageProps) {
   const navigate = useNavigate()
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+
   return (
     <div className="max-w-2xl mx-auto w-full">
       <DeckList
@@ -36,7 +41,21 @@ export function DeckOverview({
         onSelectDeck={onSelectDeck}
         onToggleDeckEnabled={onToggleDeckEnabled}
         onCreateNewDeck={onCreateNewDeck}
+        onImportDecks={() => setIsImportModalOpen(true)}
         onClose={() => navigate("/dashboard")}
+      />
+
+      <ImportWizardModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        existingDecks={decks}
+        mode="decksOnly"
+        onImportSuccess={(payload) => {
+          if (onImportDecks) {
+            onImportDecks(payload.importedDecks)
+          }
+          setIsImportModalOpen(false)
+        }}
       />
     </div>
   )

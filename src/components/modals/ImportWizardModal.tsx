@@ -32,19 +32,25 @@ export interface ImportWizardModalProps {
   onClose: () => void
   existingDecks: Deck[]
   onImportSuccess: (result: ImportSuccessPayload) => void
+  mode?: "all" | "decksOnly"
+  title?: string
+  description?: string
 }
 
 export function ImportWizardModal({
   isOpen,
   onClose,
   existingDecks,
-  onImportSuccess
+  onImportSuccess,
+  mode = "all",
+  title,
+  description
 }: ImportWizardModalProps) {
   const [parsedData, setParsedData] = useState<ParsedImportData | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([])
-  const [includeReviewData, setIncludeReviewData] = useState(true)
-  const [includeSettings, setIncludeSettings] = useState(true)
+  const [includeReviewData, setIncludeReviewData] = useState(mode !== "decksOnly")
+  const [includeSettings, setIncludeSettings] = useState(mode !== "decksOnly")
   const [importStrategy, setImportStrategy] = useState<"merge" | "createNew">("merge")
   const [isImporting, setIsImporting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -52,6 +58,10 @@ export function ImportWizardModal({
   const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const isDecksOnly = mode === "decksOnly"
+  const modalTitle = title || (isDecksOnly ? "Import Decks" : "Import Settings")
+  const modalDescription = description || (isDecksOnly ? "Select flashcard decks from a JSON file" : "")
 
   const totalCardsSelected = useMemo(() => {
     if (!parsedData) return 0
@@ -66,8 +76,8 @@ export function ImportWizardModal({
     setParsedData(null)
     setFileName(null)
     setSelectedDeckIds([])
-    setIncludeReviewData(true)
-    setIncludeSettings(true)
+    setIncludeReviewData(!isDecksOnly)
+    setIncludeSettings(!isDecksOnly)
     setIsImporting(false)
     setErrorMessage(null)
     setSuccessMessage(null)
@@ -90,11 +100,16 @@ export function ImportWizardModal({
       try {
         const text = e.target?.result as string
         const data = parseAndValidateImportJson(text)
+        if (isDecksOnly && (!data.decks || data.decks.length === 0)) {
+          setErrorMessage("No decks were found in this file.")
+          setParsedData(null)
+          return
+        }
         setParsedData(data)
         setFileName(file.name)
         setSelectedDeckIds(data.decks.map(d => d.id))
-        setIncludeReviewData(data.hasReviewData)
-        setIncludeSettings(data.hasSettings)
+        setIncludeReviewData(!isDecksOnly && data.hasReviewData)
+        setIncludeSettings(!isDecksOnly && data.hasSettings)
       } catch (err: any) {
         console.error("Failed to parse JSON file:", err)
         setErrorMessage(err.message || "Failed to parse JSON file.")
@@ -134,7 +149,12 @@ export function ImportWizardModal({
   const handleExecuteImport = async () => {
     if (!parsedData) return
 
-    if (selectedDeckIds.length === 0 && (!includeSettings || !parsedData.settings)) {
+    if (isDecksOnly) {
+      if (selectedDeckIds.length === 0) {
+        setErrorMessage("Please select at least one deck to import.")
+        return
+      }
+    } else if (selectedDeckIds.length === 0 && (!includeSettings || !parsedData.settings)) {
       setErrorMessage("Please select at least one deck or settings to import.")
       return
     }
@@ -144,10 +164,13 @@ export function ImportWizardModal({
 
     try {
       const chosenImportDecks = parsedData.decks.filter(d => selectedDeckIds.includes(d.id))
+      const shouldIncludeReview = !isDecksOnly && includeReviewData
+      const shouldIncludeSettings = !isDecksOnly && includeSettings
+
       const processedDecks: Deck[] = chosenImportDecks.map(deck => {
         const targetDeckId = importStrategy === "createNew" ? `deck-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` : deck.id
         const cards = deck.cards.map(card => {
-          const baseCard = includeReviewData ? card : stripReviewDataFromCard(card)
+          const baseCard = shouldIncludeReview ? card : stripReviewDataFromCard(card)
           return {
             ...baseCard,
             id: importStrategy === "createNew" ? `card-${Date.now()}-${Math.random().toString(36).substr(2, 5)}` : baseCard.id,
@@ -162,7 +185,7 @@ export function ImportWizardModal({
             ? `${deck.title} (Imported)`
             : deck.title,
           cards,
-          due: includeReviewData ? deck.due : 0
+          due: shouldIncludeReview ? deck.due : 0
         }
       })
 
@@ -178,7 +201,7 @@ export function ImportWizardModal({
 
       // Review history import
       let importedReviewRecordsCount = 0
-      if (includeReviewData && parsedData.reviewHistory.length > 0) {
+      if (shouldIncludeReview && parsedData.reviewHistory.length > 0) {
         const chosenDeckIdSet = new Set(selectedDeckIds)
         const relevantHistory = parsedData.reviewHistory.filter(r => chosenDeckIdSet.has(r.deckId))
 
@@ -188,7 +211,7 @@ export function ImportWizardModal({
         }
       }
 
-      const importedSettings = includeSettings && parsedData.settings ? parsedData.settings : undefined
+      const importedSettings = shouldIncludeSettings && parsedData.settings ? parsedData.settings : undefined
 
       // Notify parent app
       onImportSuccess({
@@ -197,16 +220,22 @@ export function ImportWizardModal({
         importedReviewCount: importedReviewRecordsCount
       })
 
-      setSuccessMessage(
-        `Successfully imported ${processedDecks.length} deck${processedDecks.length === 1 ? "" : "s"}${
-          importedReviewRecordsCount > 0 ? ` and ${importedReviewRecordsCount} review record${importedReviewRecordsCount === 1 ? "" : "s"}` : ""
-        }${importedSettings ? " and applied settings" : ""}!`
-      )
+      if (isDecksOnly) {
+        setSuccessMessage(
+          `Successfully imported ${processedDecks.length} deck${processedDecks.length === 1 ? "" : "s"}!`
+        )
+      } else {
+        setSuccessMessage(
+          `Successfully imported ${processedDecks.length} deck${processedDecks.length === 1 ? "" : "s"}${
+            importedReviewRecordsCount > 0 ? ` and ${importedReviewRecordsCount} review record${importedReviewRecordsCount === 1 ? "" : "s"}` : ""
+          }${importedSettings ? " and applied settings" : ""}!`
+        )
+      }
 
       setTimeout(() => {
         setIsImporting(false)
         onClose()
-      }, 1200)
+      }, isDecksOnly ? 1000 : 1200)
     } catch (err: any) {
       console.error("Import failed:", err)
       setErrorMessage(err.message || "Failed to process import.")
@@ -235,8 +264,11 @@ export function ImportWizardModal({
             </div>
             <div>
               <h3 className="font-display font-bold text-lg text-foreground">
-                Import Settings
+                {modalTitle}
               </h3>
+              {modalDescription && (
+                <p className="text-xs text-muted-foreground">{modalDescription}</p>
+              )}
             </div>
           </div>
           <button
@@ -285,7 +317,9 @@ export function ImportWizardModal({
                   Choose a JSON file or drag & drop it here
                 </h4>
                 <p className="text-xs text-muted-foreground max-w-sm">
-                  Accepts flashcards export files (.json) containing decks, review history, and app settings.
+                  {isDecksOnly
+                    ? "Accepts flashcards export files (.json) containing deck definitions."
+                    : "Accepts flashcards export files (.json) containing decks, review history, and app settings."}
                 </p>
               </div>
 
@@ -401,55 +435,59 @@ export function ImportWizardModal({
 
               {/* Options Section */}
               <div className="pt-4 space-y-3">
-                <span className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Sliders className="h-4 w-4 text-primary" />
-                  Additional Data
-                </span>
-
-                <div className="space-y-2 pt-0.5 px-3">
-                  {/* Include Review Data Checkbox */}
-                  <div
-                    onClick={() => parsedData.hasReviewData && setIncludeReviewData(prev => !prev)}
-                    className={`flex items-center gap-2.5 select-none py-1 group ${
-                      !parsedData.hasReviewData ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                    }`}
-                  >
-                    {includeReviewData && parsedData.hasReviewData ? (
-                      <CheckSquare className="h-4 w-4 text-primary shrink-0" />
-                    ) : (
-                      <Square className="h-4 w-4 text-muted-foreground/60 group-hover:text-foreground shrink-0 transition-colors" />
-                    )}
-                    <span className="text-sm font-medium text-foreground">
-                      Include review history
+                {!isDecksOnly && (
+                  <>
+                    <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Sliders className="h-4 w-4 text-primary" />
+                      Additional Data
                     </span>
-                    {!parsedData.hasReviewData && (
-                      <span className="text-xs text-muted-foreground italic">(Not in file)</span>
-                    )}
-                  </div>
 
-                  {/* Include Settings Checkbox */}
-                  <div
-                    onClick={() => parsedData.hasSettings && setIncludeSettings(prev => !prev)}
-                    className={`flex items-center gap-2.5 select-none py-1 group ${
-                      !parsedData.hasSettings ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                    }`}
-                  >
-                    {includeSettings && parsedData.hasSettings ? (
-                      <CheckSquare className="h-4 w-4 text-primary shrink-0" />
-                    ) : (
-                      <Square className="h-4 w-4 text-muted-foreground/60 group-hover:text-foreground shrink-0 transition-colors" />
-                    )}
-                    <span className="text-sm font-medium text-foreground">
-                      Include settings
-                    </span>
-                    {!parsedData.hasSettings && (
-                      <span className="text-xs text-muted-foreground italic">(Not in file)</span>
-                    )}
-                  </div>
-                </div>
+                    <div className="space-y-2 pt-0.5 px-3">
+                      {/* Include Review Data Checkbox */}
+                      <div
+                        onClick={() => parsedData.hasReviewData && setIncludeReviewData(prev => !prev)}
+                        className={`flex items-center gap-2.5 select-none py-1 group ${
+                          !parsedData.hasReviewData ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                        }`}
+                      >
+                        {includeReviewData && parsedData.hasReviewData ? (
+                          <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground/60 group-hover:text-foreground shrink-0 transition-colors" />
+                        )}
+                        <span className="text-sm font-medium text-foreground">
+                          Include review history
+                        </span>
+                        {!parsedData.hasReviewData && (
+                          <span className="text-xs text-muted-foreground italic">(Not in file)</span>
+                        )}
+                      </div>
+
+                      {/* Include Settings Checkbox */}
+                      <div
+                        onClick={() => parsedData.hasSettings && setIncludeSettings(prev => !prev)}
+                        className={`flex items-center gap-2.5 select-none py-1 group ${
+                          !parsedData.hasSettings ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                        }`}
+                      >
+                        {includeSettings && parsedData.hasSettings ? (
+                          <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground/60 group-hover:text-foreground shrink-0 transition-colors" />
+                        )}
+                        <span className="text-sm font-medium text-foreground">
+                          Include settings
+                        </span>
+                        {!parsedData.hasSettings && (
+                          <span className="text-xs text-muted-foreground italic">(Not in file)</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Import Strategy */}
-                <div className="pt-2 px-3">
+                <div className={`pt-2 ${isDecksOnly ? "px-2" : "px-3"}`}>
                   <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
                     Deck Collision Handling
                   </label>
@@ -514,13 +552,18 @@ export function ImportWizardModal({
             <button
               type="button"
               onClick={handleExecuteImport}
-              disabled={isImporting || (selectedDeckIds.length === 0 && (!includeSettings || !parsedData.settings))}
+              disabled={isImporting || (isDecksOnly ? selectedDeckIds.length === 0 : (selectedDeckIds.length === 0 && (!includeSettings || !parsedData.settings)))}
               className="px-5 h-10 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isImporting ? (
                 <>
                   <RefreshCw className="h-4 w-4 animate-spin" />
                   Importing...
+                </>
+              ) : isDecksOnly ? (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import {selectedDeckIds.length} {selectedDeckIds.length === 1 ? "Deck" : "Decks"}
                 </>
               ) : (
                 <>

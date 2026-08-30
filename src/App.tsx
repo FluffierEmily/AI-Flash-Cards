@@ -795,6 +795,7 @@ function AppContent() {
                 onSelectDeck={(id) => navigate(`/deck/${id}`)}
                 onToggleDeckEnabled={toggleDeckEnabled}
                 onCreateNewDeck={handleCreateNewDeck}
+                onImportDecks={setDecks}
               />
             }
           />
