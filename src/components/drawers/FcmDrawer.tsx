@@ -1,18 +1,33 @@
 import { useState, useEffect } from "react"
-import { Bell, Copy, Check, AlertCircle, ExternalLink, ChevronDown, ChevronUp, Trash2, Smartphone } from "lucide-react"
-import { initializeApp, getApp, getApps } from "firebase/app"
-import { getMessaging, getToken, deleteToken } from "firebase/messaging"
+import {
+  Bell,
+  Copy,
+  Check,
+  AlertCircle,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Smartphone,
+  Sparkles,
+  Zap,
+  Clock,
+  Radio,
+} from "lucide-react"
 import { fcmCloudService } from "../../lib/fcm"
 import type { LocalReminder } from "../../lib/spacedRepetition"
-
-export interface FirebaseConfig {
-  apiKey: string
-  authDomain: string
-  projectId: string
-  storageBucket: string
-  messagingSenderId: string
-  appId: string
-}
+import {
+  isNotificationSupported,
+  isNotificationTriggerSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendInstantBrowserNotification,
+  scheduleExperimentalTestNotification,
+} from "../../lib/browserNotification"
+import {
+  type FirebaseConfig,
+  parseFirebaseConfig,
+} from "../../hooks/useFcm"
 
 export interface FcmDrawerProps {
   isFcmEnabled: boolean
@@ -24,340 +39,23 @@ export interface FcmDrawerProps {
   setScheduledReminders: React.Dispatch<React.SetStateAction<LocalReminder[]>>
   cancelScheduledReminder: (reminder: LocalReminder) => Promise<void>
   triggerCloudScheduledNotification: () => Promise<void>
+  triggerExperimentalScheduledNotification?: () => Promise<void>
   useLocalEmulator: boolean
   setUseLocalEmulator: React.Dispatch<React.SetStateAction<boolean>>
-}
-
-
-
-function parseFirebaseConfig(text: string): Partial<FirebaseConfig> {
-  const extract = (key: string) => {
-    const match = text.match(new RegExp(`['"]?${key}['"]?\\s*:\\s*['"]([^'"]+)['"]`))
-    return match ? match[1] : ""
-  }
-
-  const apiKey = extract("apiKey")
-  const authDomain = extract("authDomain")
-  const projectId = extract("projectId")
-  const storageBucket = extract("storageBucket")
-  const messagingSenderId = extract("messagingSenderId")
-  const appId = extract("appId")
-
-  if (apiKey && projectId && messagingSenderId && appId) {
-    return { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId }
-  }
-
-  // Fallback to plain JSON parsing
-  try {
-    const cleanText = text.trim()
-    const parsed = JSON.parse(cleanText)
-    if (parsed && typeof parsed === "object") {
-      return {
-        apiKey: parsed.apiKey || "",
-        authDomain: parsed.authDomain || "",
-        projectId: parsed.projectId || "",
-        storageBucket: parsed.storageBucket || "",
-        messagingSenderId: parsed.messagingSenderId || "",
-        appId: parsed.appId || "",
-      }
-    }
-  } catch (e) {
-    // Ignore error
-  }
-
-  return {}
-}
-
-export function useFcm() {
-  const [isFcmEnabled, setIsFcmEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_enabled") === "true"
-    }
-    return false
-  })
-
-  const [fcmToken, setFcmToken] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_token")
-    }
-    return null
-  })
-
-  const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("fcm_config")
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch (e) {
-          console.error("Failed to parse fcm_config", e)
-        }
-      }
-    }
-    return null
-  })
-
-  const [vapidKey, setVapidKey] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_vapid_key") || ""
-    }
-    return ""
-  })
-
-  const [status, setStatus] = useState<'unconfigured' | 'connecting' | 'connected' | 'error'>(() => {
-    if (typeof window !== "undefined") {
-      const isEnabled = localStorage.getItem("fcm_enabled") === "true"
-      const hasConfig = !!localStorage.getItem("fcm_config")
-      const hasToken = !!localStorage.getItem("fcm_token")
-      if (!hasConfig) return "unconfigured"
-      if (isEnabled && hasToken) return "connected"
-      return "unconfigured"
-    }
-    return "unconfigured"
-  })
-
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
-  const getFirebaseMessaging = (config: FirebaseConfig) => {
-    try {
-      const app = getApps().length === 0 ? initializeApp(config) : getApp()
-      return getMessaging(app)
-    } catch (err) {
-      console.error("Firebase Initialization Error:", err)
-      return null
-    }
-  }
-
-  // Attempt to refresh/verify connection if config already exists
-  useEffect(() => {
-    if (isFcmEnabled && firebaseConfig && vapidKey && !fcmToken) {
-      handleEnableFcm(firebaseConfig, vapidKey).catch(() => {
-        // Suppress initial automatic error noise
-      })
-    }
-  }, [])
-
-  const handleEnableFcm = async (config: FirebaseConfig, vKey: string) => {
-    setStatus("connecting")
-    setErrorMsg(null)
-    try {
-      if (typeof Notification === "undefined") {
-        throw new Error("Notifications are not supported in this browser.")
-      }
-
-      const permission = await Notification.requestPermission()
-      if (permission !== "granted") {
-        throw new Error("Notification permission denied by user.")
-      }
-
-      if (!('serviceWorker' in navigator)) {
-        throw new Error("Service Worker is not supported by this browser.")
-      }
-
-      // Check if any service worker is registered to prevent hanging
-      const registrations = await navigator.serviceWorker.getRegistrations()
-      if (registrations.length === 0) {
-        throw new Error("No active Service Worker registration found. If you are developing locally, please reload the page to register the PWA service worker.")
-      }
-
-      const reg = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("PWA Service Worker took too long to respond. Try refreshing the page.")), 4000)
-        )
-      ])
-
-      if (!reg) {
-        throw new Error("No active Service Worker registration found.")
-      }
-
-      const messaging = getFirebaseMessaging(config)
-      if (!messaging) {
-        throw new Error("Failed to initialize Firebase SDK. Please verify config credentials.")
-      }
-
-      const token = await getToken(messaging, {
-        serviceWorkerRegistration: reg,
-        vapidKey: vKey.trim()
-      })
-
-      if (!token) {
-        throw new Error("Failed to retrieve FCM token from Google's servers.")
-      }
-
-      // Save successful credentials and state
-      setFirebaseConfig(config)
-      setVapidKey(vKey)
-      setFcmToken(token)
-      setIsFcmEnabled(true)
-      setStatus("connected")
-
-      localStorage.setItem("fcm_config", JSON.stringify(config))
-      localStorage.setItem("fcm_vapid_key", vKey)
-      localStorage.setItem("fcm_token", token)
-      localStorage.setItem("fcm_enabled", "true")
-    } catch (err: any) {
-      console.error("FCM Enable Error:", err)
-      const msg = err.message || String(err)
-      setErrorMsg(msg)
-      setStatus("error")
-      setIsFcmEnabled(false)
-      localStorage.setItem("fcm_enabled", "false")
-      throw err
-    }
-  }
-
-  const handleDisableFcm = async () => {
-    setStatus("connecting")
-    try {
-      if (firebaseConfig) {
-        const messaging = getFirebaseMessaging(firebaseConfig)
-        if (messaging) {
-          await deleteToken(messaging)
-        }
-      }
-    } catch (err) {
-      console.error("Error deleting FCM token:", err)
-    } finally {
-      setIsFcmEnabled(false)
-      setFcmToken(null)
-      localStorage.removeItem("fcm_token")
-      localStorage.setItem("fcm_enabled", "false")
-      setStatus("unconfigured")
-    }
-  }
-
-  // Refactored states & effects from FcmDrawer component
-  const [useLocalEmulator, setUseLocalEmulator] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("fcm_use_emulator") !== "false"
-    }
-    return true
-  })
-
-  const [scheduledReminders, setScheduledReminders] = useState<LocalReminder[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("fcm_scheduled_reminders")
-        if (saved) {
-          const parsed = JSON.parse(saved) as LocalReminder[]
-          const now = Date.now()
-          const active = parsed.filter(r => r.sendAt > now)
-          if (active.length !== parsed.length) {
-            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
-          }
-          return active
-        }
-      } catch (err) {
-        console.error("Failed to load initial reminders:", err)
-      }
-    }
-    return []
-  })
-
-  // Prune storage every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        const saved = localStorage.getItem("fcm_scheduled_reminders")
-        if (saved) {
-          const parsed = JSON.parse(saved) as LocalReminder[]
-          const now = Date.now()
-          const active = parsed.filter(r => r.sendAt > now)
-          if (active.length !== parsed.length) {
-            localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(active))
-            setScheduledReminders(active)
-          }
-        }
-      } catch (err) {
-        console.error("Failed to prune reminders:", err)
-      }
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  // Persist emulator setting
-  useEffect(() => {
-    localStorage.setItem("fcm_use_emulator", String(useLocalEmulator))
-  }, [useLocalEmulator])
-
-  const cancelScheduledReminder = async (reminder: LocalReminder) => {
-    const projectId = firebaseConfig?.projectId
-    if (!projectId) return
-    try {
-      await fcmCloudService.cancelReminder(projectId, reminder.taskId, reminder.useLocalEmulator)
-      
-      const saved = localStorage.getItem("fcm_scheduled_reminders")
-      const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
-      const updated = currentReminders.filter(r => r.taskId !== reminder.taskId)
-      localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
-      setScheduledReminders(updated)
-    } catch (err) {
-      console.error("Failed to cancel scheduled reminder:", err)
-      throw err
-    }
-  }
-
-  const triggerCloudScheduledNotification = async () => {
-    const projectId = firebaseConfig?.projectId
-    if (!fcmToken || !projectId) {
-      throw new Error("FCM not fully configured.")
-    }
-    const sendAtTimestamp = new Date(Date.now() + 10 * 1000).toISOString()
-    const response = await fcmCloudService.scheduleReminder(projectId, {
-      fcmToken,
-      sendAtTimestamp,
-      title: "Scheduled Cloud Test ⏰",
-      body: "Hello! This scheduled push notification has arrived after 10 seconds."
-    }, useLocalEmulator)
-
-    if (response && response.success && response.taskId) {
-      const newReminder: LocalReminder = {
-        id: Math.random().toString(36).substring(2, 9),
-        taskId: response.taskId,
-        title: "Scheduled Cloud Test ⏰",
-        body: "Hello! This scheduled push notification has arrived after 10 seconds.",
-        sendAt: new Date(sendAtTimestamp).getTime(),
-        useLocalEmulator: useLocalEmulator
-      }
-      
-      const saved = localStorage.getItem("fcm_scheduled_reminders")
-      const currentReminders = saved ? (JSON.parse(saved) as LocalReminder[]) : []
-      const updated = [...currentReminders, newReminder]
-      localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(updated))
-      setScheduledReminders(updated)
-    }
-  }
-
-  return {
-    isFcmEnabled,
-    fcmToken,
-    firebaseConfig,
-    vapidKey,
-    status,
-    errorMsg,
-    handleEnableFcm,
-    handleDisableFcm,
-    scheduledReminders,
-    setScheduledReminders,
-    cancelScheduledReminder,
-    triggerCloudScheduledNotification,
-    useLocalEmulator,
-    setUseLocalEmulator
-  }
 }
 
 export function FcmDrawer({
   isFcmEnabled,
   fcmToken,
+  firebaseConfig,
   handleEnableFcm,
   handleDisableFcm,
   scheduledReminders,
   cancelScheduledReminder,
   triggerCloudScheduledNotification,
+  triggerExperimentalScheduledNotification,
   useLocalEmulator,
-  setUseLocalEmulator
+  setUseLocalEmulator,
 }: FcmDrawerProps) {
   // Local form state initialized from localstorage if available
   const [apiKey, setApiKey] = useState(() => {
@@ -396,19 +94,26 @@ export function FcmDrawer({
   const [isLoading, setIsLoading] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
 
-  // Handle parsing when pasting the SDK configuration snippet
-  useEffect(() => {
-    if (rawConfigPaste.trim()) {
-      const parsed = parseFirebaseConfig(rawConfigPaste)
+  // Browser Notification Fallback states
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | "unsupported">(() =>
+    getNotificationPermission()
+  )
+  const isTriggerSupported = isNotificationTriggerSupported()
+  const isBrowserNotificationSupported = isNotificationSupported()
+
+  // Handle pasting SDK configuration snippet
+  const handleConfigPasteChange = (text: string) => {
+    setRawConfigPaste(text)
+    if (text.trim()) {
+      const parsed = parseFirebaseConfig(text)
       if (parsed.apiKey) setApiKey(parsed.apiKey)
       if (parsed.authDomain) setAuthDomain(parsed.authDomain)
       if (parsed.projectId) setProjectId(parsed.projectId)
       if (parsed.storageBucket) setStorageBucket(parsed.storageBucket)
       if (parsed.messagingSenderId) setMessagingSenderId(parsed.messagingSenderId)
       if (parsed.appId) setAppId(parsed.appId)
-      setRawConfigPaste("") // Clear text area after successful parsing
     }
-  }, [rawConfigPaste])
+  }
 
   const copyTokenToClipboard = async () => {
     if (!fcmToken) return
@@ -431,7 +136,7 @@ export function FcmDrawer({
       projectId: projectId.trim(),
       storageBucket: storageBucket.trim(),
       messagingSenderId: messagingSenderId.trim(),
-      appId: appId.trim()
+      appId: appId.trim(),
     }
 
     if (!config.apiKey || !config.projectId || !config.messagingSenderId || !config.appId) {
@@ -448,8 +153,10 @@ export function FcmDrawer({
 
     try {
       await handleEnableFcm(config, vKey.trim())
-    } catch (err: any) {
-      setLocalError(err.message || "Failed to configure FCM. Please check your credentials.")
+      setBrowserPermission(getNotificationPermission())
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to configure FCM. Please check your credentials."
+      setLocalError(msg)
     } finally {
       setIsLoading(false)
     }
@@ -469,50 +176,46 @@ export function FcmDrawer({
     localStorage.removeItem("fcm_vapid_key")
   }
 
-  const triggerLocalTestNotification = async () => {
+  const handleRequestBrowserPermission = async () => {
+    const perm = await requestNotificationPermission()
+    setBrowserPermission(perm)
+    if (perm === "granted") {
+      await sendInstantBrowserNotification("AI Flash Cards 🔔", {
+        body: "Browser notifications enabled! You will now receive spaced repetition study alerts.",
+      })
+    }
+  }
+
+  const triggerLocalInstantTest = async () => {
     try {
-      if (typeof Notification === "undefined") {
-        alert("Push notifications are not supported in this browser.")
+      if (!isBrowserNotificationSupported) {
+        alert("Notifications are not supported in this browser.")
         return
       }
 
-      if (Notification.permission !== "granted") {
-        const result = await Notification.requestPermission()
+      if (browserPermission !== "granted") {
+        const result = await requestNotificationPermission()
+        setBrowserPermission(result)
         if (result !== "granted") {
           alert("Notification permission was denied. Please enable notifications in your browser settings to test.")
           return
         }
       }
 
-      if ("serviceWorker" in navigator) {
-        const reg = await navigator.serviceWorker.getRegistration()
-        if (reg) {
-          await reg.showNotification("AI Flash Cards 🔔", {
-            body: "Success! Notification system is working correctly. Spaced repetition alerts will arrive when cards are due.",
-            icon: "/favicon.svg",
-            badge: "/favicon.svg",
-            tag: "fcm-test",
-          })
-          console.log("Service Worker notification triggered.")
-          return
-        }
-      }
-
-      // Fallback
-      new Notification("AI Flash Cards 🔔", {
-        body: "Success! Notification system is working correctly (Fallback notification activated).",
-        icon: "/favicon.svg"
+      await sendInstantBrowserNotification("AI Flash Cards 🔔", {
+        body: "Success! Notification system is working correctly. Spaced repetition alerts will arrive when cards are due.",
       })
-      console.log("Fallback notification triggered.")
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Test notification failed:", err)
-      alert(`Failed to trigger notification: ${err.message || err}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      alert(`Failed to trigger notification: ${msg}`)
     }
   }
 
   const [isCloudSending, setIsCloudSending] = useState(false)
   const [isCloudScheduling, setIsCloudScheduling] = useState(false)
-  const [cloudStatus, setCloudStatus] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [isExperimentalScheduling, setIsExperimentalScheduling] = useState(false)
+  const [notificationStatusMsg, setNotificationStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
@@ -524,70 +227,116 @@ export function FcmDrawer({
     return () => clearInterval(timer)
   }, [])
 
-  const handleCancelScheduledReminder = async (reminder: LocalReminder) => {
-    if (!projectId) return
-    setCancellingTaskId(reminder.taskId)
+  const handleCancelReminder = async (reminder: LocalReminder) => {
+    const targetId = reminder.id || reminder.taskId
+    setCancellingTaskId(targetId)
     try {
       await cancelScheduledReminder(reminder)
-      setCloudStatus({ type: "success", text: "Successfully cancelled scheduled reminder!" })
-    } catch (err: any) {
+      setNotificationStatusMsg({ type: "success", text: "Successfully cancelled scheduled reminder!" })
+    } catch (err: unknown) {
       console.error(err)
-      const errorMsg = err.message || String(err)
-      setCloudStatus({ type: "error", text: `Failed to cancel reminder: ${errorMsg}` })
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      setNotificationStatusMsg({ type: "error", text: `Failed to cancel reminder: ${errorMsg}` })
     } finally {
       setCancellingTaskId(null)
     }
   }
 
   const triggerCloudTestNotification = async () => {
+    const pid = projectId || firebaseConfig?.projectId
     if (!fcmToken) {
       setLocalError("FCM registration token is required. Please enable Push Notifications first.")
       return
     }
-    if (!projectId) {
+    if (!pid) {
       setLocalError("Project ID is required to invoke Cloud Functions.")
       return
     }
 
     setIsCloudSending(true)
-    setCloudStatus(null)
+    setNotificationStatusMsg(null)
     try {
-      await fcmCloudService.sendPushNotification(projectId, {
-        fcmToken,
-        title: "Cloud Test ☁️",
-        body: "Hello! This push notification was sent via your Cloud Function."
-      }, useLocalEmulator)
-      setCloudStatus({ type: "success", text: `Successfully sent cloud push notification via ${useLocalEmulator ? "Emulator" : "Production"}!` })
+      await fcmCloudService.sendPushNotification(
+        pid,
+        {
+          fcmToken,
+          title: "Cloud Test ☁️",
+          body: "Hello! This push notification was sent via your Cloud Function.",
+        },
+        useLocalEmulator
+      )
+      setNotificationStatusMsg({
+        type: "success",
+        text: `Successfully sent cloud push notification via ${useLocalEmulator ? "Emulator" : "Production"}!`,
+      })
     } catch (err) {
       console.error(err)
       const errorMsg = err instanceof Error ? err.message : String(err)
-      setCloudStatus({ type: "error", text: `Cloud Send Failed: ${errorMsg}` })
+      setNotificationStatusMsg({ type: "error", text: `Cloud Send Failed: ${errorMsg}` })
     } finally {
       setIsCloudSending(false)
     }
   }
 
-  const handleTriggerCloudScheduledNotification = async () => {
+  const handleTriggerCloudScheduled = async () => {
+    const pid = projectId || firebaseConfig?.projectId
     if (!fcmToken) {
       setLocalError("FCM registration token is required. Please enable Push Notifications first.")
       return
     }
-    if (!projectId) {
+    if (!pid) {
       setLocalError("Project ID is required to invoke Cloud Functions.")
       return
     }
 
     setIsCloudScheduling(true)
-    setCloudStatus(null)
+    setNotificationStatusMsg(null)
     try {
       await triggerCloudScheduledNotification()
-      setCloudStatus({ type: "success", text: `Successfully scheduled reminder for 10s from now via ${useLocalEmulator ? "Emulator" : "Production"}!` })
-    } catch (err: any) {
+      setNotificationStatusMsg({
+        type: "success",
+        text: `Successfully scheduled reminder for 10s from now via ${useLocalEmulator ? "Emulator" : "Production"}!`,
+      })
+    } catch (err: unknown) {
       console.error(err)
-      const errorMsg = err.message || String(err)
-      setCloudStatus({ type: "error", text: `Cloud Schedule Failed: ${errorMsg}` })
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      setNotificationStatusMsg({ type: "error", text: `Cloud Schedule Failed: ${errorMsg}` })
     } finally {
       setIsCloudScheduling(false)
+    }
+  }
+
+  const handleTriggerExperimentalScheduled = async () => {
+    if (browserPermission !== "granted") {
+      const result = await requestNotificationPermission()
+      setBrowserPermission(result)
+      if (result !== "granted") {
+        alert("Notification permission is required to schedule local browser reminders.")
+        return
+      }
+    }
+
+    setIsExperimentalScheduling(true)
+    setNotificationStatusMsg(null)
+    try {
+      if (triggerExperimentalScheduledNotification) {
+        await triggerExperimentalScheduledNotification()
+      } else {
+        const { isNativeTrigger } = await scheduleExperimentalTestNotification(10)
+        console.log("Scheduled test notification:", { isNativeTrigger })
+      }
+      setNotificationStatusMsg({
+        type: "success",
+        text: `Scheduled test reminder for 10s from now via ${
+          isTriggerSupported ? "Notification Triggers API" : "Browser Timer Fallback"
+        }!`,
+      })
+    } catch (err: unknown) {
+      console.error(err)
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      setNotificationStatusMsg({ type: "error", text: `Local Schedule Failed: ${errorMsg}` })
+    } finally {
+      setIsExperimentalScheduling(false)
     }
   }
 
@@ -600,30 +349,95 @@ export function FcmDrawer({
           Intelligent Flashcard Review Reminders
         </div>
         <p>
-          Firebase Cloud Messaging sends system-level browser notifications when cards are due, prompting you to review for maximum retention, even when the app is closed.
+          AI Flash Cards schedules study reminders to maximize retention. Supports both <strong>Firebase Cloud Messaging (FCM)</strong> for cross-device cloud push and the <strong>Experimental Browser Notification API (Notification Triggers)</strong> as a zero-config local fallback.
         </p>
       </div>
 
-      {/* FCM Connection Status Panel */}
+      {/* Active Notification Engine Status */}
       <div className="space-y-3">
-        <h4 className="font-semibold text-sm text-foreground">Push Notification Status</h4>
+        <h4 className="font-semibold text-sm text-foreground">Notification Engine Status</h4>
         <div className="p-4 rounded-xl border border-border bg-secondary/30 space-y-3">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold">{isFcmEnabled ? "Push Reminders Active" : "Reminders Disabled"}</p>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold">
+                  {isFcmEnabled ? "Firebase Cloud Messaging (FCM)" : "Experimental Browser Notifications (Local Fallback)"}
+                </p>
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                {isFcmEnabled ? "Registered with Firebase servers" : "Configure project credentials below to enable"}
+                {isFcmEnabled
+                  ? "Connected to Firebase backend. Delivers push notifications across devices."
+                  : browserPermission === "granted"
+                  ? isTriggerSupported
+                    ? "Active fallback: Using experimental TimestampTrigger API for offline local scheduling."
+                    : "Active fallback: Using browser service worker and client timer scheduler."
+                  : "Fallback ready: Grant browser notification permission to activate automatic local reminders."}
               </p>
             </div>
-            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isFcmEnabled ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
-              {isFcmEnabled ? "Enabled" : "Disabled"}
+            <span
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ml-2 ${
+                isFcmEnabled
+                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                  : browserPermission === "granted"
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              {isFcmEnabled ? "FCM Active" : browserPermission === "granted" ? "Local Fallback Active" : "Permission Needed"}
             </span>
           </div>
 
-          {/* Token Copy Section */}
+          {/* Browser Capabilities Card */}
+          <div className="p-3 rounded-lg bg-background border border-border/70 space-y-2 text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Radio className="h-3.5 w-3.5 text-primary" /> Browser Permission:
+              </span>
+              <span
+                className={`font-semibold capitalize ${
+                  browserPermission === "granted"
+                    ? "text-emerald-500"
+                    : browserPermission === "denied"
+                    ? "text-rose-500"
+                    : "text-amber-500"
+                }`}
+              >
+                {browserPermission}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-indigo-500" /> Notification Triggers API:
+              </span>
+              <span
+                className={`font-semibold ${
+                  isTriggerSupported ? "text-emerald-500" : "text-muted-foreground font-normal"
+                }`}
+              >
+                {isTriggerSupported ? "Supported (Native Offline)" : "Timer Fallback"}
+              </span>
+            </div>
+
+            {browserPermission !== "granted" && (
+              <div className="pt-2 border-t border-border/50 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleRequestBrowserPermission}
+                  className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                >
+                  Enable Browser Notifications
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Token Copy Section when FCM is enabled */}
           {isFcmEnabled && fcmToken && (
             <div className="pt-2 border-t border-border/50 space-y-1.5">
-              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">FCM Registration Token</label>
+              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                FCM Registration Token
+              </label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -645,7 +459,7 @@ export function FcmDrawer({
       </div>
 
       {/* Display errors if they occur */}
-      {(localError) && (
+      {localError && (
         <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-500 flex items-start gap-2.5 leading-relaxed">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div>
@@ -655,9 +469,153 @@ export function FcmDrawer({
         </div>
       )}
 
-      {/* Setup Forms */}
-      <div className="space-y-4">
-        <h4 className="font-semibold text-sm text-foreground">Configuration Details</h4>
+      {/* Testing & Triggers Section */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+          <Sparkles className="h-4 w-4 text-purple-500" /> Test Notification Senders
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            onClick={triggerLocalInstantTest}
+            className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-secondary/20 hover:bg-secondary/40 text-foreground text-xs font-semibold transition-all cursor-pointer"
+          >
+            <Smartphone className="h-3.5 w-3.5 text-purple-500" />
+            Instant Browser Notification
+          </button>
+          <button
+            onClick={handleTriggerExperimentalScheduled}
+            disabled={isExperimentalScheduling}
+            className="h-10 px-3 flex items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            {isExperimentalScheduling ? "Scheduling..." : "Test 10s Fallback Trigger"}
+          </button>
+        </div>
+
+        {isFcmEnabled && (
+          <div className="space-y-2.5 border-t border-border/50 pt-3">
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Cloud Function Push Tests
+            </label>
+            <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/50 bg-secondary/15">
+              <span className="text-[11px] font-medium text-foreground">Route cloud requests to local Emulator</span>
+              <button
+                type="button"
+                onClick={() => setUseLocalEmulator(!useLocalEmulator)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                  useLocalEmulator ? "bg-purple-500" : "bg-border"
+                }`}
+                role="switch"
+                aria-checked={useLocalEmulator}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    useLocalEmulator ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={triggerCloudTestNotification}
+                disabled={isCloudSending || isCloudScheduling}
+                className="h-10 flex items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {isCloudSending ? "Sending..." : "Cloud Send"}
+              </button>
+              <button
+                onClick={handleTriggerCloudScheduled}
+                disabled={isCloudSending || isCloudScheduling}
+                className="h-10 flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+                {isCloudScheduling ? "Scheduling..." : "Cloud Schedule (10s)"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {notificationStatusMsg && (
+          <div
+            className={`p-2.5 rounded-lg border text-[11px] font-semibold ${
+              notificationStatusMsg.type === "success"
+                ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                : "border-rose-500/25 bg-rose-500/5 text-rose-500"
+            }`}
+          >
+            {notificationStatusMsg.text}
+          </div>
+        )}
+      </div>
+
+      {/* Active Scheduled Reminders Queue */}
+      {scheduledReminders.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-sm text-foreground">
+              Scheduled Study Reminders ({scheduledReminders.length})
+            </h4>
+            <span className="text-[10px] text-muted-foreground">Auto-synced with cards</span>
+          </div>
+
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {scheduledReminders.map((reminder) => {
+              const secondsLeft = Math.max(0, Math.ceil((reminder.sendAt - currentTime) / 1000))
+              const isExp = reminder.type === "experimental"
+              const reminderKey = reminder.id || reminder.taskId
+
+              return (
+                <div
+                  key={reminderKey}
+                  className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:bg-secondary/15 transition-all text-xs"
+                >
+                  <div className="space-y-1 min-w-0 flex-1 pr-3">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold truncate text-foreground">{reminder.title}</p>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                          isExp
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                            : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                        }`}
+                      >
+                        {isExp ? "Experimental API" : reminder.useLocalEmulator ? "FCM Emulator" : "FCM Cloud"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground truncate">{reminder.body}</p>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-indigo-500 font-semibold flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {secondsLeft > 0 ? `Delivering in ${secondsLeft}s (${new Date(reminder.sendAt).toLocaleTimeString()})` : "Delivering now..."}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCancelReminder(reminder)}
+                    disabled={cancellingTaskId === reminderKey}
+                    className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-50 cursor-pointer"
+                    title="Cancel scheduled reminder"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* FCM Configuration Details Section */}
+      <div className="space-y-4 pt-2 border-t border-border/60">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-semibold text-sm text-foreground">Firebase Cloud Messaging Setup</h4>
+            <p className="text-[11px] text-muted-foreground">
+              Optional: configure your own Firebase project for cloud-wide cross-device push.
+            </p>
+          </div>
+        </div>
 
         {/* Paste Box */}
         {!isFcmEnabled && (
@@ -665,7 +623,7 @@ export function FcmDrawer({
             <label className="text-xs font-medium text-foreground">Paste Firebase Web App SDK Configuration</label>
             <textarea
               value={rawConfigPaste}
-              onChange={(e) => setRawConfigPaste(e.target.value)}
+              onChange={(e) => handleConfigPasteChange(e.target.value)}
               placeholder={`const firebaseConfig = {
   apiKey: "AIzaSy...",
   authDomain: "...",
@@ -673,7 +631,7 @@ export function FcmDrawer({
   messagingSenderId: "...",
   appId: "..."
 };`}
-              rows={5}
+              rows={4}
               className="w-full text-xs p-3 font-mono rounded-xl border border-border bg-background placeholder:text-muted-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none"
             />
             <p className="text-[10px] text-muted-foreground">
@@ -684,7 +642,7 @@ export function FcmDrawer({
 
         {/* VAPID Web Push certificate key */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground">Web Push VAPID Public Key (Required)</label>
+          <label className="text-xs font-medium text-foreground">Web Push VAPID Public Key</label>
           <input
             type="text"
             value={vKey}
@@ -694,7 +652,7 @@ export function FcmDrawer({
             className="w-full h-10 px-3 text-xs rounded-xl border border-border bg-background focus:ring-1 focus:ring-primary focus:border-primary outline-none disabled:opacity-60"
           />
           <p className="text-[10px] text-muted-foreground">
-            Found under Cloud Messaging Settings &rarr; Web Push Certificates. Required to subscribe the browser.
+            Found under Cloud Messaging Settings &rarr; Web Push Certificates in Firebase Console.
           </p>
         </div>
 
@@ -707,7 +665,7 @@ export function FcmDrawer({
             <span>Manual Configuration Fields</span>
             {isManualExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </button>
-          
+
           {isManualExpanded && (
             <div className="p-4 border-t border-border/80 bg-secondary/10 space-y-3.5">
               <div className="grid grid-cols-2 gap-3.5">
@@ -781,136 +739,36 @@ export function FcmDrawer({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Action Controls */}
-      <div className="space-y-2.5 pt-2">
-        {!isFcmEnabled ? (
-          <button
-            onClick={handleSaveAndEnable}
-            disabled={isLoading}
-            className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-95 active:scale-[0.99] transition-all shadow-sm cursor-pointer disabled:opacity-70"
-          >
-            <Bell className="h-4 w-4" />
-            {isLoading ? "Validating & Subscribing..." : "Enable Push & Save Config"}
-          </button>
-        ) : (
-          <div className="flex gap-2">
+        {/* Action Controls */}
+        <div className="space-y-2.5 pt-1">
+          {!isFcmEnabled ? (
             <button
-              onClick={handleDisableFcm}
-              className="flex-1 h-11 flex items-center justify-center gap-2 rounded-xl border border-border bg-card text-foreground font-semibold text-sm hover:bg-accent hover:text-accent-foreground transition-all shadow-sm cursor-pointer"
+              onClick={handleSaveAndEnable}
+              disabled={isLoading}
+              className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-95 active:scale-[0.99] transition-all shadow-sm cursor-pointer disabled:opacity-70"
             >
-              Disable Push
+              <Bell className="h-4 w-4" />
+              {isLoading ? "Validating & Subscribing..." : "Enable Push & Save Config"}
             </button>
-            <button
-              onClick={handleClearConfig}
-              className="px-3 h-11 flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
-              title="Delete config completely"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        <button
-          onClick={triggerLocalTestNotification}
-          className="w-full h-10 flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-secondary/20 hover:bg-secondary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-all cursor-pointer"
-        >
-          <Smartphone className="h-3.5 w-3.5" />
-          Test Notification Permission (Local Send)
-        </button>
-
-        {isFcmEnabled && (
-          <div className="space-y-2.5 border-t border-border/50 pt-3">
-            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Cloud Function Tests</label>
-            <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/50 bg-secondary/15">
-              <span className="text-[11px] font-medium text-foreground">Route requests to local Emulator</span>
+          ) : (
+            <div className="flex gap-2">
               <button
-                type="button"
-                onClick={() => setUseLocalEmulator(!useLocalEmulator)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                  useLocalEmulator ? "bg-purple-500" : "bg-border"
-                }`}
-                role="switch"
-                aria-checked={useLocalEmulator}
+                onClick={handleDisableFcm}
+                className="flex-1 h-11 flex items-center justify-center gap-2 rounded-xl border border-border bg-card text-foreground font-semibold text-sm hover:bg-accent hover:text-accent-foreground transition-all shadow-sm cursor-pointer"
               >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    useLocalEmulator ? "translate-x-4" : "translate-x-0"
-                  }`}
-                />
+                Disable Push
+              </button>
+              <button
+                onClick={handleClearConfig}
+                className="px-3 h-11 flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition-all cursor-pointer"
+                title="Delete config completely"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={triggerCloudTestNotification}
-                disabled={isCloudSending || isCloudScheduling}
-                className="h-10 flex items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Bell className="h-3.5 w-3.5" />
-                {isCloudSending ? "Sending..." : "Cloud Send"}
-              </button>
-              <button
-                onClick={handleTriggerCloudScheduledNotification}
-                disabled={isCloudSending || isCloudScheduling}
-                className="h-10 flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Smartphone className="h-3.5 w-3.5" />
-                {isCloudScheduling ? "Scheduling..." : "Cloud Schedule (10s)"}
-              </button>
-            </div>
-            {cloudStatus && (
-              <div className={`p-2.5 rounded-lg border text-[11px] font-semibold ${
-                cloudStatus.type === "success"
-                  ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
-                  : "border-rose-500/25 bg-rose-500/5 text-rose-500"
-              }`}>
-                {cloudStatus.text}
-              </div>
-            )}
-
-            {/* Scheduled Reminders List */}
-            {scheduledReminders.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-border/50 space-y-2 text-left">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                  Scheduled Reminders ({scheduledReminders.length})
-                </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {scheduledReminders.map((reminder) => {
-                    const secondsLeft = Math.max(0, Math.ceil((reminder.sendAt - currentTime) / 1000))
-                    return (
-                      <div 
-                        key={reminder.taskId}
-                        className="flex items-center justify-between p-2.5 rounded-xl border border-border bg-secondary/10 hover:bg-secondary/20 transition-all text-xs"
-                      >
-                        <div className="space-y-0.5 min-w-0 flex-1 pr-2">
-                          <p className="font-semibold truncate text-foreground flex items-center gap-1.5">
-                            {reminder.title}
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 font-normal">
-                              {reminder.useLocalEmulator ? "Emulator" : "Cloud"}
-                            </span>
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate">{reminder.body}</p>
-                          <p className="text-[10px] text-indigo-500 font-semibold">
-                            {secondsLeft > 0 ? `Delivering in ${secondsLeft}s...` : "Delivering now..."}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleCancelScheduledReminder(reminder)}
-                          disabled={cancellingTaskId === reminder.taskId}
-                          className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition-colors disabled:opacity-50 cursor-pointer"
-                          title="Cancel scheduled reminder"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Guide details */}
@@ -930,7 +788,16 @@ export function FcmDrawer({
             <p>To receive notifications offline, you need your own Firebase project credentials:</p>
             <ol className="list-decimal pl-5 space-y-2 text-[11px]">
               <li>
-                Open the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-semibold inline-flex items-center gap-0.5">Firebase Console <ExternalLink className="h-2.5 w-2.5" /></a> and click <strong>Add Project</strong>.
+                Open the{" "}
+                <a
+                  href="https://console.firebase.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-semibold inline-flex items-center gap-0.5"
+                >
+                  Firebase Console <ExternalLink className="h-2.5 w-2.5" />
+                </a>{" "}
+                and click <strong>Add Project</strong>.
               </li>
               <li>
                 Once created, click the <strong>Web icon (&lt;/&gt;)</strong> in the project home dashboard to add a Web app.

@@ -17,7 +17,7 @@ import { HashRouter as Router, Routes, Route, useNavigate, useLocation, useParam
 import { encryptApiKey, decryptApiKey, type EncryptedPayload } from "./lib/crypto"
 import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "./lib/db"
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
-import { useFcm } from "./components/drawers/FcmDrawer"
+import { useFcm } from "./hooks/useFcm"
 import { Settings, type SettingsState, DEFAULT_SETTINGS } from "./pages/Settings"
 import { type Deck } from "./components/Deck/Deck"
 import { Dashboard } from "./pages/Dashboard"
@@ -29,6 +29,7 @@ import { Setup } from "./pages/Setup"
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
 import { clearAllReviewHistory } from "./lib/historyStorage"
+import { initBrowserNotificationTimers } from "./lib/browserNotification"
 
 function AppContent() {
   // Decks & Deck Editor State
@@ -286,6 +287,7 @@ function AppContent() {
     setScheduledReminders,
     cancelScheduledReminder,
     triggerCloudScheduledNotification,
+    triggerExperimentalScheduledNotification,
     handleEnableFcm,
     handleDisableFcm,
     setUseLocalEmulator
@@ -294,17 +296,17 @@ function AppContent() {
   // Spaced Repetition Queue & Filter State
   const [reviewQueue, setReviewQueue] = useState<any[]>([])
 
-  // Sync FCM Reminders whenever decks, settings, or FCM state changes
+  // Sync Reminders (FCM Cloud Push or Experimental Browser Notification Fallback)
   useEffect(() => {
-    if (hasLoadedDecks && isFcmEnabled && fcmToken && firebaseConfig?.projectId) {
+    if (hasLoadedDecks) {
       syncFcmReminders(
         decks,
         settings,
-        fcmToken,
-        firebaseConfig.projectId,
+        isFcmEnabled ? fcmToken : null,
+        isFcmEnabled ? (firebaseConfig?.projectId || null) : null,
         useLocalEmulator,
         setScheduledReminders
-      ).catch((err) => console.error("Failed to sync FCM reminders:", err))
+      ).catch((err) => console.error("Failed to sync study reminders:", err))
     }
   }, [
     decks,
@@ -316,6 +318,19 @@ function AppContent() {
     settings.reminderInterval,
     settings.spacedRepetition
   ])
+
+  // Initialize client timers for active in-memory experimental reminders
+  useEffect(() => {
+    const experimentalReminders = scheduledReminders
+      .filter((r) => r.type === "experimental")
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        sendAt: r.sendAt,
+      }))
+    initBrowserNotificationTimers(experimentalReminders)
+  }, [scheduledReminders])
 
 
   // Theme Sync
@@ -886,6 +901,7 @@ function AppContent() {
           setScheduledReminders,
           cancelScheduledReminder,
           triggerCloudScheduledNotification,
+          triggerExperimentalScheduledNotification,
           useLocalEmulator,
           setUseLocalEmulator
         }}

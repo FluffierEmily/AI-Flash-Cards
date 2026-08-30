@@ -2,13 +2,20 @@ import type { Flashcard, MasteryLevel, ReviewHistoryRecord } from "../components
 import type { Deck } from "../components/Deck/Deck"
 import type { SettingsState } from "../pages/Settings"
 import { fcmCloudService } from "./fcm"
+import {
+  scheduleExperimentalNotification,
+  cancelExperimentalNotification,
+  getNotificationPermission
+} from "./browserNotification"
+
 export interface LocalReminder {
   id: string
   taskId: string
   title: string
   body: string
   sendAt: number
-  useLocalEmulator: boolean
+  useLocalEmulator?: boolean
+  type?: "fcm" | "experimental"
 }
 
 /**
@@ -278,7 +285,10 @@ export function getReviewQueue(
 }
 
 /**
- * Synchronizes FCM reminders based on calculated review dates.
+ * Synchronizes review reminders based on calculated review dates.
+ * Uses FCM Cloud Messaging when configured, and seamlessly falls back to
+ * the Experimental Browser Notification API (TimestampTrigger / client timer)
+ * when FCM is not yet configured.
  */
 export async function syncFcmReminders(
   decks: Deck[],
@@ -288,7 +298,32 @@ export async function syncFcmReminders(
   useLocalEmulator: boolean,
   setScheduledReminders: React.Dispatch<React.SetStateAction<LocalReminder[]>>
 ) {
-  if (!fcmToken || !projectId || !settings.spacedRepetition) {
+  if (!settings.spacedRepetition) {
+    // Clear all scheduled reminders if spaced repetition is disabled
+    let savedReminders: LocalReminder[] = []
+    try {
+      const saved = localStorage.getItem("fcm_scheduled_reminders")
+      if (saved) savedReminders = JSON.parse(saved) as LocalReminder[]
+    } catch (e) {
+      console.error("Failed to parse saved reminders", e)
+    }
+    for (const r of savedReminders) {
+      if (r.type === "experimental") {
+        cancelExperimentalNotification(r.id).catch(() => {})
+      } else if (r.type === "fcm" && projectId) {
+        fcmCloudService.cancelReminder(projectId, r.taskId, r.useLocalEmulator).catch(() => {})
+      }
+    }
+    localStorage.removeItem("fcm_scheduled_reminders")
+    setScheduledReminders([])
+    return
+  }
+
+  const isFcmActive = Boolean(fcmToken && projectId)
+  const notificationPermission = getNotificationPermission()
+  const isBrowserFallbackActive = !isFcmActive && notificationPermission === "granted"
+
+  if (!isFcmActive && !isBrowserFallbackActive) {
     return
   }
 
@@ -296,29 +331,33 @@ export async function syncFcmReminders(
   const now = Date.now()
 
   // 1. Gather all active cards
-  const enabledDecks = decks.filter(d => d.enabled)
-  const allCards = enabledDecks.flatMap(d => d.cards)
+  const enabledDecks = decks.filter((d) => d.enabled)
+  const allCards = enabledDecks.flatMap((d) => d.cards)
 
   // 2. Separate currently due and future due cards
-  const currentlyDue = allCards.filter(c => !c.nextReviewDate || new Date(c.nextReviewDate).getTime() <= now)
+  const currentlyDue = allCards.filter(
+    (c) => !c.nextReviewDate || new Date(c.nextReviewDate).getTime() <= now
+  )
   const futureDue = allCards
-    .filter(c => c.nextReviewDate && new Date(c.nextReviewDate).getTime() > now)
-    .sort((a, b) => new Date(a.nextReviewDate!).getTime() - new Date(b.nextReviewDate!).getTime())
+    .filter((c) => c.nextReviewDate && new Date(c.nextReviewDate).getTime() > now)
+    .sort(
+      (a, b) =>
+        new Date(a.nextReviewDate!).getTime() -
+        new Date(b.nextReviewDate!).getTime()
+    )
 
   const M = currentlyDue.length
 
   // 3. Find the future timestamps where due count hits multiples of interval
   const calculatedTimestamps: number[] = []
-  
-  // Cap at a maximum of 5 future reminders to avoid overwhelming the FCM scheduler
   const maxReminders = 5
   let k = Math.floor(M / interval) + 1
-  
+
   while (calculatedTimestamps.length < maxReminders) {
     const targetDueCount = k * interval
     const neededFutureCards = targetDueCount - M
     const targetIndex = neededFutureCards - 1
-    
+
     if (targetIndex < futureDue.length) {
       const dueDateStr = futureDue[targetIndex].nextReviewDate!
       const timestamp = new Date(dueDateStr).getTime()
@@ -342,16 +381,30 @@ export async function syncFcmReminders(
     console.error("Failed to parse saved reminders", e)
   }
 
-  // Filter out saved reminders that have already passed
-  savedReminders = savedReminders.filter(r => r.sendAt > now)
+  // Filter out reminders whose time has already passed
+  savedReminders = savedReminders.filter((r) => r.sendAt > now)
 
-  // 5. Reconcile
+  // 5. Clean up mode mismatches (e.g. upgraded from experimental to FCM or vice versa)
+  const currentMode = isFcmActive ? "fcm" : "experimental"
+  const mismatchedReminders = savedReminders.filter((r) => r.type && r.type !== currentMode)
+  for (const mismatched of mismatchedReminders) {
+    if (mismatched.type === "experimental") {
+      await cancelExperimentalNotification(mismatched.id).catch(() => {})
+    } else if (mismatched.type === "fcm" && projectId) {
+      await fcmCloudService.cancelReminder(projectId, mismatched.taskId, mismatched.useLocalEmulator).catch(() => {})
+    }
+  }
+  savedReminders = savedReminders.filter((r) => !r.type || r.type === currentMode)
+
+  // 6. Reconcile
   const remindersToKeep: LocalReminder[] = []
   const remindersToCancel: LocalReminder[] = []
   const timestampsToSchedule: number[] = []
 
   for (const saved of savedReminders) {
-    const matchedIndex = calculatedTimestamps.findIndex(ts => Math.abs(ts - saved.sendAt) < 2000)
+    const matchedIndex = calculatedTimestamps.findIndex(
+      (ts) => Math.abs(ts - saved.sendAt) < 2000
+    )
     if (matchedIndex !== -1) {
       remindersToKeep.push(saved)
       calculatedTimestamps.splice(matchedIndex, 1)
@@ -362,44 +415,83 @@ export async function syncFcmReminders(
 
   timestampsToSchedule.push(...calculatedTimestamps)
 
-  // 6. Cancel no longer needed reminders
+  // 7. Cancel no longer needed reminders
   for (const r of remindersToCancel) {
     try {
-      await fcmCloudService.cancelReminder(projectId, r.taskId, r.useLocalEmulator)
+      if (r.type === "experimental") {
+        await cancelExperimentalNotification(r.id)
+      } else if (projectId) {
+        await fcmCloudService.cancelReminder(projectId, r.taskId, r.useLocalEmulator)
+      }
     } catch (err) {
-      console.error(`Failed to cancel FCM reminder task ${r.taskId}:`, err)
+      console.error(`Failed to cancel reminder task ${r.taskId || r.id}:`, err)
     }
   }
 
-  // 7. Schedule new reminders
+  // 8. Schedule new reminders
   const newScheduledReminders: LocalReminder[] = [...remindersToKeep]
+
   for (const ts of timestampsToSchedule) {
     try {
-      const countAtTimestamp = M + futureDue.filter(c => new Date(c.nextReviewDate!).getTime() <= ts).length
-      const response = await fcmCloudService.scheduleReminder(projectId, {
-        fcmToken,
-        sendAtTimestamp: new Date(ts).toISOString(),
-        title: "Study Flashcards! 📚",
-        body: `You have ${countAtTimestamp} cards due for review. Keep up your learning streak!`
-      }, useLocalEmulator)
+      const countAtTimestamp =
+        M + futureDue.filter((c) => new Date(c.nextReviewDate!).getTime() <= ts).length
+      const title = "Study Flashcards! 📚"
+      const body = `You have ${countAtTimestamp} cards due for review. Keep up your learning streak!`
 
-      if (response && response.success && response.taskId) {
-        newScheduledReminders.push({
-          id: Math.random().toString(36).substring(2, 9),
-          taskId: response.taskId,
-          title: "Study Flashcards! 📚",
-          body: `You have ${countAtTimestamp} cards due for review. Keep up your learning streak!`,
-          sendAt: ts,
+      if (isFcmActive && fcmToken && projectId) {
+        // Schedule via FCM Cloud Messaging
+        const response = await fcmCloudService.scheduleReminder(
+          projectId,
+          {
+            fcmToken,
+            sendAtTimestamp: new Date(ts).toISOString(),
+            title,
+            body,
+          },
           useLocalEmulator
+        )
+
+        if (response && response.success && response.taskId) {
+          newScheduledReminders.push({
+            id: Math.random().toString(36).substring(2, 9),
+            taskId: response.taskId,
+            title,
+            body,
+            sendAt: ts,
+            useLocalEmulator,
+            type: "fcm",
+          })
+        }
+      } else if (isBrowserFallbackActive) {
+        // Schedule via Experimental Browser Notification API (TimestampTrigger / Timer)
+        const id = Math.random().toString(36).substring(2, 9)
+        await scheduleExperimentalNotification({
+          id,
+          title,
+          body,
+          sendAt: ts,
+        })
+
+        newScheduledReminders.push({
+          id,
+          taskId: `local-${id}`,
+          title,
+          body,
+          sendAt: ts,
+          useLocalEmulator: false,
+          type: "experimental",
         })
       }
     } catch (err) {
-      console.error(`Failed to schedule FCM reminder at timestamp ${ts}:`, err)
+      console.error(`Failed to schedule reminder at timestamp ${ts}:`, err)
     }
   }
 
-  // 8. Update localStorage and state
+  // 9. Update localStorage and state
   localStorage.setItem("fcm_scheduled_reminders", JSON.stringify(newScheduledReminders))
   setScheduledReminders(newScheduledReminders)
 }
+
+export const syncStudyReminders = syncFcmReminders
+
 
