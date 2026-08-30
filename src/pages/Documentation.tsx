@@ -257,9 +257,6 @@ export function Documentation() {
                   <h3 className="font-bold text-lg text-foreground font-display">
                     Graph Controls
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Explore long-term learning history with dynamic pan, zoom, and fullscreen capabilities.
-                  </p>
                 </div>
               </div>
 
@@ -356,9 +353,9 @@ export function Documentation() {
 
           {/* Spaced Repetition Section */}
           <section id="spaced-repetition" className="scroll-mt-24">
-            <div id="ro-sr" className="scroll-mt-24 relative overflow-hidden rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-xs">
+            <div id="ro-sr" className="scroll-mt-24 rounded-3xl border border-border bg-card p-6 shadow-xs space-y-4">
               <div className="absolute top-0 right-0 h-40 w-40 bg-gradient-to-bl from-primary/5 to-transparent rounded-bl-full pointer-events-none" />
-              <div className="flex items-start gap-4 relative z-10">
+              <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 text-primary rounded-2xl border border-primary/20 shrink-0">
                   <Brain className="h-7 w-7" />
                 </div>
@@ -366,11 +363,11 @@ export function Documentation() {
                   <h2 className="font-display text-2xl font-bold text-foreground">
                     Recall-Optimized Spaced Repetition (RO-SR)
                   </h2>
-                  <p className="text-base text-muted-foreground leading-relaxed">
-                    Standard spaced repetition algorithms (like SM-2) calculate memory decay based purely on your qualitative feedback (e.g. rating a card as &quot;easy&quot; or &quot;hard&quot;). Our system enhances this by introducing two key innovations: <strong className="text-foreground font-semibold">hour-based scheduling</strong> and <strong className="text-foreground font-semibold">recall-duration calibration</strong>.
-                  </p>
                 </div>
               </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Standard spaced repetition algorithms (like SM-2) calculate memory decay based purely on your qualitative feedback (e.g. rating a card as &quot;easy&quot; or &quot;hard&quot;). Our system enhances this by introducing two key innovations: <strong className="text-foreground font-semibold">hour-based scheduling</strong> and <strong className="text-foreground font-semibold">recall-duration calibration</strong>.
+              </p>
             </div>
           </section>
 
