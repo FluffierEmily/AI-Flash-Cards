@@ -408,11 +408,10 @@ export function Dashboard({
                   <button
                     key={interval}
                     onClick={() => setSelectedSpeedGrowthInterval(interval)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${
-                      selectedSpeedGrowthInterval === interval
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${selectedSpeedGrowthInterval === interval
                         ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
                         : "text-muted-foreground hover:text-foreground"
-                    }`}
+                      }`}
                   >
                     {interval}
                   </button>
@@ -436,13 +435,12 @@ export function Dashboard({
             <div className="rounded-2xl border border-border/60 bg-secondary/30 p-3 flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">Avg Speed Growth</span>
               <span
-                className={`text-sm font-bold font-display ${
-                  stats.avgSpeedGrowth > 0
+                className={`text-sm font-bold font-display ${stats.avgSpeedGrowth > 0
                     ? "text-emerald-500"
                     : stats.avgSpeedGrowth < 0
                       ? "text-rose-500"
                       : "text-foreground"
-                }`}
+                  }`}
               >
                 {stats.avgSpeedGrowth > 0 ? `+${stats.avgSpeedGrowth}%` : `${stats.avgSpeedGrowth}%`}
               </span>
@@ -492,9 +490,6 @@ export function Dashboard({
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Daily review consistency & practice frequency
-                </p>
               </div>
             </div>
 
