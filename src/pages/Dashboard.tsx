@@ -210,7 +210,7 @@ export function Dashboard({
       </div>
 
       {/* Spaced Repetition Mastery Levels */}
-      <div className="rounded-3xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="rounded-3xl border border-border bg-card p-4 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center gap-2">
           <Layers className="h-5 w-5 text-primary" />
           <h3 className="font-bold text-base text-foreground font-display">Mastery Levels</h3>
@@ -222,28 +222,28 @@ export function Dashboard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 pt-2 justify-items-center">
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-4 md:gap-6 pt-2 justify-items-center">
           {STATUS_METADATA.map((status) => (
             <div
               key={status.key}
-              className="relative group flex flex-col items-center justify-center transition-all duration-200"
+              className="relative group flex flex-col items-center justify-center transition-all duration-200 w-full min-w-0"
             >
               {/* Circle with card count inside */}
               <div
-                className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex flex-col items-center justify-center shadow-xs transition-all duration-300 ${status.bgColor} ${status.borderColor} group-hover:scale-105 group-hover:shadow-md`}
+                className={`w-12 h-12 min-[380px]:w-14 min-[380px]:h-14 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full border sm:border-2 flex flex-col items-center justify-center shadow-xs transition-all duration-300 ${status.bgColor} ${status.borderColor} group-hover:scale-105 group-hover:shadow-md`}
               >
-                <span className="text-3xl sm:text-4xl font-extrabold font-display text-foreground leading-none">
+                <span className="text-base min-[380px]:text-lg sm:text-3xl md:text-4xl font-extrabold font-display text-foreground leading-none">
                   {latestHistory[status.key] ?? 0}
                 </span>
-                <span className="text-[10px] font-semibold text-muted-foreground mt-1.5 uppercase tracking-wider">
+                <span className="text-[7px] min-[380px]:text-[8px] sm:text-[10px] font-semibold text-muted-foreground mt-0.5 sm:mt-1.5 uppercase tracking-wider">
                   cards
                 </span>
               </div>
 
               {/* Badge underneath the circle */}
-              <div className="mt-3">
+              <div className="mt-1.5 sm:mt-3 w-full flex justify-center">
                 <span
-                  className="inline-block text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+                  className="inline-block text-[7.5px] min-[380px]:text-[8.5px] sm:text-[10px] font-bold sm:font-extrabold uppercase tracking-tight sm:tracking-wider px-1 sm:px-2.5 py-0.5 rounded-full truncate max-w-full text-center"
                   style={{
                     color: status.color,
                     backgroundColor: `${status.color}15`,
