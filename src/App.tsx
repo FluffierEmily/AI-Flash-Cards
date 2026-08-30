@@ -19,12 +19,12 @@ import { saveEncryptedApiKey, getEncryptedApiKey, removeEncryptedApiKey } from "
 import { SetupDrawer } from "./components/drawers/SetupDrawer"
 import { useFcm } from "./components/drawers/FcmDrawer"
 import { Settings, type SettingsState, DEFAULT_SETTINGS } from "./pages/Settings"
-import { INITIAL_DECKS } from "./components/Deck/Decks"
 import { type Deck } from "./components/Deck/Deck"
 import { Dashboard } from "./pages/Dashboard"
 import { Review } from "./pages/Review"
 import { DeckOverview, DeckViewer } from "./pages/DeckOverview"
 import { Documentation } from "./pages/Documentation"
+import { Setup } from "./pages/Setup"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
 import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
@@ -60,7 +60,7 @@ function AppContent() {
       })
       .catch((err) => {
         console.error("Failed to load decks", err)
-        setDecks(INITIAL_DECKS)
+        setDecks([])
         setHasLoadedDecks(true)
       })
   }, [])
@@ -72,23 +72,31 @@ function AppContent() {
     }
   }, [decks, hasLoadedDecks])
 
-  // Restore route on load
+  // Redirect to /setup when deck count is 0, or handle initial root navigation
   useEffect(() => {
-    const savedPath = localStorage.getItem("current_page")
-    if (savedPath && savedPath !== location.pathname) {
-      if (savedPath.startsWith("/review") && reviewQueue.length === 0) {
-        navigate("/dashboard", { replace: true })
-      } else {
-        navigate(savedPath, { replace: true })
+    if (!hasLoadedDecks) return
+
+    if (decks.length === 0) {
+      if (location.pathname !== "/setup") {
+        navigate("/setup", { replace: true })
       }
     } else if (location.pathname === "/") {
-      navigate("/dashboard", { replace: true })
+      const savedPath = localStorage.getItem("current_page")
+      if (savedPath && savedPath !== "/" && savedPath !== "/setup") {
+        if (savedPath.startsWith("/review") && reviewQueue.length === 0) {
+          navigate("/dashboard", { replace: true })
+        } else {
+          navigate(savedPath, { replace: true })
+        }
+      } else {
+        navigate("/dashboard", { replace: true })
+      }
     }
-  }, [])
+  }, [hasLoadedDecks, decks.length, location.pathname])
 
   // Save route on change
   useEffect(() => {
-    if (location.pathname && location.pathname !== "/" && !location.pathname.startsWith("/review")) {
+    if (location.pathname && location.pathname !== "/" && location.pathname !== "/setup" && !location.pathname.startsWith("/review")) {
       localStorage.setItem("current_page", location.pathname)
     }
   }, [location.pathname])
@@ -507,7 +515,7 @@ function AppContent() {
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
         <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/dashboard")}>
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate(decks.length === 0 ? "/setup" : "/dashboard")}>
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/20">
                 <Sparkles className="h-5 w-5" />
               </div>
@@ -750,6 +758,20 @@ function AppContent() {
       <main className="container max-w-6xl mx-auto py-8 px-4 sm:px-6">
         <Routes>
           <Route
+            path="/setup"
+            element={
+              <Setup
+                isPwaInstalled={isPwaInstalled}
+                canInstallDirectly={!!deferredPrompt}
+                handleInstallPwa={handleInstallPwa}
+                onCreateDeck={handleCreateNewDeck}
+                existingDecks={decks}
+                onImportData={handleImportData}
+                decksCount={decks.length}
+              />
+            }
+          />
+          <Route
             path="/dashboard"
             element={
               <Dashboard
@@ -824,7 +846,7 @@ function AppContent() {
               />
             }
           />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to={decks.length === 0 ? "/setup" : "/dashboard"} replace />} />
         </Routes>
       </main>
 

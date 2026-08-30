@@ -15,7 +15,6 @@ import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
 import type { SettingsState } from "../../pages/Settings"
 import type { Deck } from "../Deck/Deck"
-import { INITIAL_DECKS } from "../Deck/Decks"
 import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { ModelSelectorModal } from "../modals/ModelSelectorModal"
@@ -304,7 +303,7 @@ export function FlashcardReview({
   }
 
   const activeCard = cards[activeCardIndex]
-  const activeDeck = decks.find((d) => d.id === activeCard?.deckId) || INITIAL_DECKS.find((d) => d.id === activeCard?.deckId)
+  const activeDeck = decks.find((d) => d.id === activeCard?.deckId)
   const deckName = activeDeck?.title || ""
 
   const handleScore = (rating: "again" | "hard" | "good" | "easy") => {

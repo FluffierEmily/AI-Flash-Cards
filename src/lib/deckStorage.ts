@@ -1,4 +1,3 @@
-import { INITIAL_DECKS } from "../components/Deck/Decks"
 import type { Deck } from "../components/Deck/Deck"
 import type { Flashcard } from "../components/Flashcard/Flashcard"
 import { openDB } from "./db"
@@ -63,7 +62,7 @@ export function sanitizeDeck(deck: any): Deck {
 }
 
 export async function loadDecks(): Promise<Deck[]> {
-  if (typeof window === "undefined") return INITIAL_DECKS
+  if (typeof window === "undefined") return []
   try {
     const db = await openDB()
     return new Promise((resolve) => {
@@ -73,21 +72,21 @@ export async function loadDecks(): Promise<Deck[]> {
       
       request.onsuccess = () => {
         const result = request.result
-        if (result && Array.isArray(result) && result.length > 0) {
+        if (result && Array.isArray(result)) {
           resolve(result.map(sanitizeDeck))
         } else {
-          resolve(INITIAL_DECKS)
+          resolve([])
         }
       }
       
       request.onerror = (e) => {
-        console.error("Error fetching decks from IndexedDB, falling back to INITIAL_DECKS", e)
-        resolve(INITIAL_DECKS)
+        console.error("Error fetching decks from IndexedDB, falling back to empty decks", e)
+        resolve([])
       }
     })
   } catch (e) {
     console.error("Failed to open IndexedDB to load decks", e)
-    return INITIAL_DECKS
+    return []
   }
 }
 
