@@ -65,6 +65,16 @@ A highly customizable, modern offline-first Single Page Application (SPA) and Pr
    pnpm run build
    ```
 
+5. **Deploy Frontend**
+   ```bash
+   pnpm run deploy:hosting
+   ```
+
+6. **Deploy Full Project (Frontend + Cloud Functions):**
+   ```bash
+   pnpm run deploy
+   ```
+
 ## 🔔 Firebase Cloud Messaging (FCM) Setup
 
 To configure system-level push notification reminders for card reviews (even when the app is closed):

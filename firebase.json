@@ -1,4 +1,18 @@
 {
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "functions": [
     {
       "source": "functions",
@@ -17,6 +31,9 @@
     }
   ],
   "emulators": {
+    "hosting": {
+      "port": 5000
+    },
     "functions": {
       "port": 5001
     },
@@ -25,3 +42,4 @@
     }
   }
 }
+
