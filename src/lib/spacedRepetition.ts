@@ -274,14 +274,15 @@ export function getReviewQueue(
   const allowedNewCards = Math.max(0, 10 - reviewedToday)
   const selectedNewCards = newCards.slice(0, allowedNewCards)
 
-  let queue = [...scheduledDue, ...selectedNewCards]
+  const shuffledNewCards = settings.cardShuffle
+    ? [...selectedNewCards].sort(() => Math.random() - 0.5)
+    : selectedNewCards
 
-  // Shuffle if cardShuffle is enabled
-  if (settings.cardShuffle) {
-    queue = queue.sort(() => Math.random() - 0.5)
-  }
+  const shuffledScheduledDue = settings.cardShuffle
+    ? [...scheduledDue].sort(() => Math.random() - 0.5)
+    : scheduledDue
 
-  return queue
+  return [...shuffledNewCards, ...shuffledScheduledDue]
 }
 
 /**

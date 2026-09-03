@@ -9,7 +9,9 @@ import {
   Zap,
   X,
   HelpCircle,
-  Settings
+  Settings,
+  ArrowRight,
+  BookOpen
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
@@ -19,7 +21,12 @@ import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { ModelSelectorModal } from "../modals/ModelSelectorModal"
 import { PinDecryptModal } from "../modals/PinDecryptModal"
-import { getNewCardsReviewedTodayCount } from "../../lib/spacedRepetition"
+
+export interface ReviewSessionItem {
+  card: Flashcard
+  type: "new_read" | "review"
+  isImmediateReview?: boolean
+}
 
 export const SAMPLE_CARDS: Flashcard[] = [
   {
@@ -81,22 +88,45 @@ export function FlashcardReview({
   onReviewCard,
   onClose
 }: FlashcardReviewProps) {
-  const [activeCardIndex, setActiveCardIndex] = useState(0)
-  const [isFlipped, setIsFlipped] = useState(false)
+  // Build 2-phase session items:
+  // Phase 1: New cards to read (up to 10 for the day) flipped to back by default, rating buttons replaced by Next Card
+  // Phase 2: Immediate review of the newly read cards, followed by scheduled due reviews
+  const [sessionItems] = useState<ReviewSessionItem[]>(() => {
+    const newCards = cards.filter((c) => !c.nextReviewDate)
+    const scheduledCards = cards.filter((c) => !!c.nextReviewDate)
+
+    const readItems: ReviewSessionItem[] = newCards.map((c) => ({
+      card: c,
+      type: "new_read"
+    }))
+
+    const immediateReviewItems: ReviewSessionItem[] = newCards.map((c) => ({
+      card: c,
+      type: "review",
+      isImmediateReview: true
+    }))
+
+    const scheduledReviewItems: ReviewSessionItem[] = scheduledCards.map((c) => ({
+      card: c,
+      type: "review",
+      isImmediateReview: false
+    }))
+
+    let reviewItems = [...immediateReviewItems, ...scheduledReviewItems]
+    if (settings.cardShuffle) {
+      reviewItems = reviewItems.sort(() => Math.random() - 0.5)
+    }
+
+    return [...readItems, ...reviewItems]
+  })
+
+  const [activeSessionIndex, setActiveSessionIndex] = useState(0)
+  const currentItem = sessionItems[activeSessionIndex]
+  const [isFlipped, setIsFlipped] = useState(() => currentItem?.type === "new_read")
   const [userAnswer, setUserAnswer] = useState("")
 
-  const totalReviewsDue = (() => {
-    if (!settings.spacedRepetition) return 0
-    const activeDeckIds = Array.from(new Set(cards.map(c => c.deckId)))
-    const sessionDecks = decks.filter(d => activeDeckIds.includes(d.id))
-    const sessionCards = sessionDecks.flatMap(d => d.cards)
-    const now = new Date()
-    const scheduledDue = sessionCards.filter(c => c.nextReviewDate && new Date(c.nextReviewDate) <= now).length
-    const newCards = sessionCards.filter(c => !c.nextReviewDate).length
-    const reviewedToday = getNewCardsReviewedTodayCount()
-    const allowedNewCards = Math.max(0, 10 - reviewedToday)
-    return scheduledDue + Math.min(newCards, allowedNewCards)
-  })()
+  const totalNewCardsToRead = sessionItems.filter(item => item.type === "new_read").length
+  const totalReviewsInSession = sessionItems.filter(item => item.type === "review").length
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [evalProgress, setEvalProgress] = useState(0)
 
@@ -172,13 +202,19 @@ export function FlashcardReview({
     return parseFloat((totalMs / 1000).toFixed(3))
   }
 
-  // Reset revealed hints and timer when card changes
+  // Reset revealed hints, timer, and flip state when card changes
   useEffect(() => {
+    if (activeSessionIndex < sessionItems.length) {
+      const item = sessionItems[activeSessionIndex]
+      setIsFlipped(item.type === "new_read")
+    }
     setRevealedHints({})
+    setEvalResult(null)
+    setUserAnswer("")
     elapsedTimeRef.current = 0
     lastActiveTimeRef.current = Date.now()
     isTimerRunningRef.current = document.visibilityState === "visible"
-  }, [activeCardIndex])
+  }, [activeSessionIndex, sessionItems])
 
   // Manage pause/resume on page visibility, focus, and blur events
   useEffect(() => {
@@ -227,7 +263,7 @@ export function FlashcardReview({
   const backRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (activeCardIndex >= cards.length) return
+    if (activeSessionIndex >= sessionItems.length) return
     const activeElement = isFlipped ? backRef.current : frontRef.current
     if (!activeElement) return
 
@@ -239,9 +275,9 @@ export function FlashcardReview({
 
     resizeObserver.observe(activeElement)
     return () => resizeObserver.disconnect()
-  }, [isFlipped, userAnswer, evalResult, activeCardIndex, cards.length])
+  }, [isFlipped, userAnswer, evalResult, activeSessionIndex, sessionItems.length])
 
-  if (cards.length === 0) {
+  if (cards.length === 0 || sessionItems.length === 0) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 shadow-sm text-center space-y-4 max-w-md mx-auto">
         <CheckCircle22 className="h-12 w-12 text-emerald-500 mx-auto" />
@@ -261,7 +297,7 @@ export function FlashcardReview({
     return <CheckCircle2 {...props} />
   }
 
-  if (activeCardIndex >= cards.length) {
+  if (activeSessionIndex >= sessionItems.length) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 shadow-sm text-center space-y-6 max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-3 duration-300">
         <div className="h-16 w-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
@@ -302,9 +338,14 @@ export function FlashcardReview({
     )
   }
 
-  const activeCard = cards[activeCardIndex]
+  const activeCard = currentItem.card
+  const isReadMode = currentItem.type === "new_read"
   const activeDeck = decks.find((d) => d.id === activeCard?.deckId)
   const deckName = activeDeck?.title || ""
+
+  const handleNextInReadMode = () => {
+    setActiveSessionIndex((prev) => prev + 1)
+  }
 
   const handleScore = (rating: "again" | "hard" | "good" | "easy") => {
     setStats((prev) => ({
@@ -323,7 +364,7 @@ export function FlashcardReview({
     setIsFlipped(false)
     setEvalResult(null)
     setUserAnswer("")
-    setActiveCardIndex((prev) => prev + 1)
+    setActiveSessionIndex((prev) => prev + 1)
   }
 
   const runRealAIEvaluation = async (apiKey: string) => {
@@ -391,9 +432,18 @@ export function FlashcardReview({
 
             {/* Card Meta Header */}
             <div className="flex items-center justify-between mb-6 relative">
-              <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
-                Review
-              </h3>
+              <div className="flex items-center gap-2">
+                {isReadMode ? (
+                  <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                    New Card
+                  </span>
+                ) : currentItem.isImmediateReview ? (
+                  <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Review
+                  </span>
+                ) : null}
+              </div>
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
                 {deckName && (
                   <span className="text-sm font-medium text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] whitespace-nowrap">
@@ -407,6 +457,28 @@ export function FlashcardReview({
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {!isReadMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(true)}
+                    className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Flip to back"
+                    aria-label="Flip to back"
+                  >
+                    <RefreshCw className="h-4.5 w-4.5" />
+                  </button>
+                )}
+                {/* Settings button to open model selector */}
+                {!isReadMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsModelSelectorOpen(true)}
+                    className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
+                  >
+                    <Settings className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 {onClose && (
                   <button
                     type="button"
@@ -422,7 +494,7 @@ export function FlashcardReview({
             </div>
 
             {/* Card Body - Front */}
-            <div className="min-h-[160px] flex flex-col justify-center mb-6">
+            <div className="flex flex-col justify-center mb-6">
               <div className="text-center">
                 <h2 className="font-display text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-3xl break-words">
                   {activeCard.question}
@@ -477,63 +549,59 @@ export function FlashcardReview({
             )}
 
             {/* Input section & controls */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <RichTextEditor value={userAnswer} onChange={setUserAnswer} placeholder="Your answer (optional)" />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={triggerAIEvaluation}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 relative overflow-hidden ${isEvaluating
-                    ? "pointer-events-none opacity-100 animate-gradient-shimmer"
-                    : !userAnswer.replace(/<[^>]*>/g, "").trim()
-                      ? "bg-primary opacity-40 pointer-events-none"
-                      : "bg-primary cursor-pointer"
-                    }`}
-                >
-                  {isEvaluating && (
-                    <div
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-violet-200/10 to-violet-200/65 transition-all duration-100 ease-out pointer-events-none overflow-hidden"
-                      style={{ width: `${evalProgress}%` }}
-                    >
-                      {/* Shimmer overlay */}
-                      <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
-                      <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-violet-200 shadow-[0_0_8px_#e9d5ff]" />
-                    </div>
-                  )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    {isEvaluating ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        AI Evaluating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-5 w-5" />
-                        Evaluate with AI
-                      </>
-                    )}
-                  </span>
-                </button>
-
+            {isReadMode ? (
+              <div className="flex items-center justify-center pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsModelSelectorOpen(true)}
-                  className="flex items-center justify-center rounded-xl border border-border px-3.5 h-12 text-muted-foreground hover:text-foreground hover:bg-accent hover:border-accent-foreground/30 transition-all duration-200 cursor-pointer shrink-0"
-                  title={`Configure AI Model for Evaluation (Current: ${aiEvaluationProvider} - ${aiEvaluationModel})`}
+                  onClick={handleNextInReadMode}
+                  className="w-full max-w-[200px] h-12 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer shadow-md shadow-primary/20"
                 >
-                  <Settings className="h-5 w-5" />
-                </button>
-
-                <button
-                  onClick={() => setIsFlipped(true)}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-border px-5 h-12 font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-98 shadow-sm cursor-pointer"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Flip
+                  <span>Next Card</span>
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <RichTextEditor value={userAnswer} onChange={setUserAnswer} placeholder="Your answer (optional)" />
+                </div>
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={triggerAIEvaluation}
+                    className={`w-full max-w-[200px] flex items-center justify-center gap-2 rounded-xl px-4 h-12 font-semibold text-primary-foreground hover:opacity-95 transition-all duration-200 active:scale-98 shadow-sm shadow-primary/25 relative overflow-hidden ${isEvaluating
+                      ? "pointer-events-none opacity-100 animate-gradient-shimmer"
+                      : !userAnswer.replace(/<[^>]*>/g, "").trim()
+                        ? "bg-primary opacity-40 pointer-events-none"
+                        : "bg-primary cursor-pointer"
+                      }`}
+                  >
+                    {isEvaluating && (
+                      <div
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-violet-200/10 to-violet-200/65 transition-all duration-100 ease-out pointer-events-none overflow-hidden"
+                        style={{ width: `${evalProgress}%` }}
+                      >
+                        {/* Shimmer overlay */}
+                        <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
+                        <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-violet-200 shadow-[0_0_8px_#e9d5ff]" />
+                      </div>
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      {isEvaluating ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                          AI Evaluating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-5 w-5" />
+                          Evaluate with AI
+                        </>
+                      )}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Back Side */}
@@ -548,9 +616,18 @@ export function FlashcardReview({
 
             {/* Card Meta Header */}
             <div className="flex items-center justify-between mb-6 relative">
-              <h3 className="font-display font-bold text-lg text-foreground flex items-center gap-2">
-                Review
-              </h3>
+              <div className="flex items-center gap-2">
+                {isReadMode ? (
+                  <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                    New Card
+                  </span>
+                ) : currentItem.isImmediateReview ? (
+                  <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Review
+                  </span>
+                ) : null}
+              </div>
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
                 {deckName && (
                   <span className="text-sm font-medium text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] whitespace-nowrap">
@@ -564,15 +641,28 @@ export function FlashcardReview({
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {!isReadMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(false)}
+                    className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title="Flip to front"
+                    aria-label="Flip to front"
+                  >
+                    <RefreshCw className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 {/* Settings button to open model selector */}
-                <button
-                  type="button"
-                  onClick={() => setIsModelSelectorOpen(true)}
-                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
-                >
-                  <Settings className="h-4.5 w-4.5" />
-                </button>
+                {!isReadMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsModelSelectorOpen(true)}
+                    className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title={`AI Model: ${aiEvaluationProvider} - ${aiEvaluationModel}`}
+                  >
+                    <Settings className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 {onClose && (
                   <button
                     type="button"
@@ -588,14 +678,14 @@ export function FlashcardReview({
             </div>
 
             {/* Card Body - Back */}
-            <div className="min-h-[160px] flex flex-col justify-center mb-6">
-              <div className="space-y-4">
+            <div className="flex flex-col justify-center mb-6 text-center">
+              <div className="space-y-4 text-center">
                 <div className="text-center">
-                  <h4 className="font-medium text-foreground text-base sm:text-lg">{activeCard.question}</h4>
+                  <h4 className="font-medium text-foreground text-base sm:text-lg underline">{activeCard.question}</h4>
                 </div>
-                <div className="border-t border-border pt-4">
-                  <p
-                    className="text-foreground leading-relaxed text-sm sm:text-base"
+                <div className="pt-2 text-center">
+                  <div
+                    className="text-foreground leading-relaxed text-sm sm:text-base text-center [&_p]:text-center"
                     dangerouslySetInnerHTML={{ __html: activeCard.answer }}
                   />
                 </div>
@@ -694,75 +784,67 @@ export function FlashcardReview({
               )}
 
               <div className="space-y-4 pt-4 border-t border-border">
-                {evalResult ? (
-                  /* AI Rated: Next Card and Flip Buttons side-by-side */
-                  <div className="flex gap-3">
+                {isReadMode ? (
+                  /* Read Mode: Next Card button */
+                  <div className="flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={handleNextInReadMode}
+                      className="w-full max-w-[200px] h-12 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer shadow-md shadow-primary/20"
+                    >
+                      <span>Next Card</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : evalResult ? (
+                  /* AI Rated: Next Card button centered */
+                  <div className="flex items-center justify-center">
                     <button
                       onClick={() => handleScore(evalResult.rating)}
-                      className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer shadow-md shadow-primary/20"
+                      className="w-full max-w-[200px] h-12 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer shadow-md shadow-primary/20"
                     >
                       Next Card
-                    </button>
-                    <button
-                      onClick={() => setIsFlipped(false)}
-                      className="flex items-center justify-center gap-2 rounded-xl border border-border px-5 h-12 font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-98 shadow-sm cursor-pointer"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Flip
                     </button>
                   </div>
                 ) : (
                   /* Manual Self-Scoring Buttons */
-                  <>
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                      {/* Again Button */}
-                      <button
-                        onClick={() => handleScore("again")}
-                        className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-red-600 dark:text-red-400 border border-border hover:border-red-500 dark:hover:border-red-400 hover:bg-red-500/20 dark:hover:bg-red-400/5 shadow-sm"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Again
-                      </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    {/* Again Button */}
+                    <button
+                      onClick={() => handleScore("again")}
+                      className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-red-600 dark:text-red-400 border border-border hover:border-red-500 dark:hover:border-red-400 hover:bg-red-500/20 dark:hover:bg-red-400/5 shadow-sm"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Again
+                    </button>
 
-                      {/* Hard Button */}
-                      <button
-                        onClick={() => handleScore("hard")}
-                        className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-amber-600 dark:text-amber-400 border border-border hover:border-amber-500 dark:hover:border-amber-400 hover:bg-amber-500/20 dark:hover:bg-amber-400/5 shadow-sm"
-                      >
-                        <Meh className="h-4 w-4" />
-                        Hard
-                      </button>
+                    {/* Hard Button */}
+                    <button
+                      onClick={() => handleScore("hard")}
+                      className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-amber-600 dark:text-amber-400 border border-border hover:border-amber-500 dark:hover:border-amber-400 hover:bg-amber-500/20 dark:hover:bg-amber-400/5 shadow-sm"
+                    >
+                      <Meh className="h-4 w-4" />
+                      Hard
+                    </button>
 
-                      {/* Good Button */}
-                      <button
-                        onClick={() => handleScore("good")}
-                        className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-blue-600 dark:text-blue-400 border border-border hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-500/20 dark:hover:bg-blue-400/5 shadow-sm"
-                      >
-                        <Smile className="h-4 w-4" />
-                        Good
-                      </button>
+                    {/* Good Button */}
+                    <button
+                      onClick={() => handleScore("good")}
+                      className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-blue-600 dark:text-blue-400 border border-border hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-500/20 dark:hover:bg-blue-400/5 shadow-sm"
+                    >
+                      <Smile className="h-4 w-4" />
+                      Good
+                    </button>
 
-                      {/* Easy Button */}
-                      <button
-                        onClick={() => handleScore("easy")}
-                        className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-emerald-600 dark:text-emerald-400 border border-border hover:border-emerald-500 dark:hover:border-emerald-400 hover:bg-emerald-500/20 dark:hover:bg-emerald-400/5 shadow-sm"
-                      >
-                        <Zap className="h-4 w-4" />
-                        Easy
-                      </button>
-                    </div>
-
-                    {/* Flip Button to see front again */}
-                    <div className="flex justify-center">
-                      <button
-                        onClick={() => setIsFlipped(false)}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-border px-5 h-12 font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-98 shadow-sm cursor-pointer"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        Flip
-                      </button>
-                    </div>
-                  </>
+                    {/* Easy Button */}
+                    <button
+                      onClick={() => handleScore("easy")}
+                      className="flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-xl font-semibold text-xs transition-all duration-200 active:scale-95 cursor-pointer bg-card text-emerald-600 dark:text-emerald-400 border border-border hover:border-emerald-500 dark:hover:border-emerald-400 hover:bg-emerald-500/20 dark:hover:bg-emerald-400/5 shadow-sm"
+                    >
+                      <Zap className="h-4 w-4" />
+                      Easy
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -809,60 +891,35 @@ export function FlashcardReview({
         <div className="w-full h-3 bg-secondary/40 rounded-full overflow-hidden p-0.5 border border-border/20">
           <div
             className="h-full bg-gradient-to-r from-primary via-violet-500 to-emerald-500 transition-all duration-500 rounded-full relative overflow-hidden"
-            style={{ width: `${(activeCardIndex / cards.length) * 100}%` }}
+            style={{ width: `${(activeSessionIndex / sessionItems.length) * 100}%` }}
           >
             {/* Shimmer overlay */}
             <div className="absolute inset-0 w-full h-full shimmer-bar animate-shimmer-sweep" />
           </div>
         </div>
 
-        <div className="relative h-6 text-xs font-bold text-muted-foreground select-none mt-1">
-          {/* Reviewed cards (centered under current progress) */}
-          {activeCardIndex > 0 && (
-            <span
-              className="absolute transition-all duration-500 ease-in-out whitespace-nowrap text-foreground font-bold group cursor-help"
-              style={{
-                left: `${((activeCardIndex / cards.length) * 100) / 2}%`,
-                transform: "translateX(-50%)",
-                textShadow: "0 1px 3px rgba(0, 0, 0, 0.25)"
-              }}
-            >
-              {activeCardIndex}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-md pointer-events-none z-50 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
-                Reviewed
+        <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground px-1">
+          {isReadMode ? (
+            <>
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <BookOpen className="h-3.5 w-3.5" />
+                {activeSessionIndex + 1}
               </span>
-            </span>
-          )}
-
-          {/* Total due count (centered under remaining bar) */}
-          {activeCardIndex < cards.length && (
-            <span
-              className="absolute transition-all duration-500 ease-in-out whitespace-nowrap text-primary font-bold group cursor-help"
-              style={{
-                left: `${(100 + (activeCardIndex / cards.length) * 100) / 2}%`,
-                transform: "translateX(-50%)",
-                textShadow: "0 1px 3px rgba(0, 0, 0, 0.25)"
-              }}
-            >
-              {totalReviewsDue}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-md pointer-events-none z-50 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
-                still due
+              <span>
+                {totalReviewsInSession}
               </span>
-            </span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5 text-foreground">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+                {activeSessionIndex - totalNewCardsToRead}
+              </span>
+              <span>
+                {sessionItems.length - activeSessionIndex}
+              </span>
+            </>
           )}
-
-          {/* Total cards in session (at the far end) */}
-          <span
-            className="absolute right-0 font-extrabold text-foreground group cursor-help"
-            style={{
-              textShadow: "0 1px 3px rgba(0, 0, 0, 0.25)"
-            }}
-          >
-            {cards.length}
-            <span className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block bg-popover border border-border text-popover-foreground text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-md pointer-events-none z-50 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
-              Total cards
-            </span>
-          </span>
         </div>
       </div>
     </div>
