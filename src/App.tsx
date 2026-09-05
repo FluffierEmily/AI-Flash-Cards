@@ -27,7 +27,7 @@ import { Documentation } from "./pages/Documentation"
 import { Setup } from "./pages/Setup"
 
 import { loadDecks, saveDecks } from "./lib/deckStorage"
-import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount } from "./lib/spacedRepetition"
+import { getDeckDueCount, getReviewQueue, syncFcmReminders, getNewCardsReviewedTodayCount, getDailyLearningLimit } from "./lib/spacedRepetition"
 import { clearAllReviewHistory } from "./lib/historyStorage"
 import { initBrowserNotificationTimers } from "./lib/browserNotification"
 
@@ -517,7 +517,8 @@ function AppContent() {
     const scheduledDue = allCards.filter(c => c.nextReviewDate && new Date(c.nextReviewDate) <= now).length
     const newCards = allCards.filter(c => !c.nextReviewDate).length
     const reviewedToday = getNewCardsReviewedTodayCount()
-    const allowedNewCards = Math.max(0, 10 - reviewedToday)
+    const dailyLimit = getDailyLearningLimit(settings)
+    const allowedNewCards = Math.max(0, dailyLimit - reviewedToday)
     return scheduledDue + Math.min(newCards, allowedNewCards)
   })()
 
@@ -792,6 +793,8 @@ function AppContent() {
               <Dashboard
                 decks={decksWithDueCounts}
                 totalDue={totalReviewsDue}
+                settings={settings}
+                onUpdateSetting={handleUpdateSetting}
                 onStartReview={() => {
                   const queue = getReviewQueue(decks, settings, null)
                   setReviewQueue(queue)

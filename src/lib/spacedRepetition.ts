@@ -224,6 +224,14 @@ export function recordNewCardReviewed(cardId: string) {
 }
 
 /**
+ * Returns the configured daily new cards learning limit.
+ */
+export function getDailyLearningLimit(settings?: SettingsState): number {
+  if (!settings) return 10
+  return typeof settings.dailyLearningLimit === "number" ? settings.dailyLearningLimit : 10
+}
+
+/**
  * Returns the count of due cards for a deck.
  */
 export function getDeckDueCount(deck: Deck, settings: SettingsState): number {
@@ -242,7 +250,8 @@ export function getDeckDueCount(deck: Deck, settings: SettingsState): number {
 
   // Cap based on remaining global new cards allowance
   const reviewedToday = getNewCardsReviewedTodayCount()
-  const allowedNewCards = Math.max(0, 10 - reviewedToday)
+  const dailyLimit = getDailyLearningLimit(settings)
+  const allowedNewCards = Math.max(0, dailyLimit - reviewedToday)
   return scheduledDue + Math.min(newCards, allowedNewCards)
 }
 
@@ -271,7 +280,8 @@ export function getReviewQueue(
 
   // Limit new cards based on remaining global allowance
   const reviewedToday = getNewCardsReviewedTodayCount()
-  const allowedNewCards = Math.max(0, 10 - reviewedToday)
+  const dailyLimit = getDailyLearningLimit(settings)
+  const allowedNewCards = Math.max(0, dailyLimit - reviewedToday)
   const selectedNewCards = newCards.slice(0, allowedNewCards)
 
   const shuffledNewCards = settings.cardShuffle

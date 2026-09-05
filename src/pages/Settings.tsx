@@ -16,7 +16,10 @@ import {
   X,
   Download,
   Upload,
-  Database
+  Database,
+  GraduationCap,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react"
 
 import { DEFAULT_EVAL_PROMPT } from "../lib/aiEvaluation"
@@ -24,11 +27,17 @@ import { DEFAULT_HINT_PROMPT } from "../lib/aiHints"
 import type { Deck } from "../components/Deck/Deck"
 import { ExportWizardModal } from "../components/modals/ExportWizardModal"
 import { ImportWizardModal, type ImportSuccessPayload } from "../components/modals/ImportWizardModal"
+import { LearningSpeedOptions } from "../components/common/LearningSpeedOptions"
+
+export type DailyLearningLimitMode = "balanced" | "advanced" | "challenging" | "custom"
 
 export interface SettingsState {
   cardShuffle: boolean
   spacedRepetition: boolean
   dailyReviewLimit: number // 0 = unlimited
+  dailyLearningLimit: number // maximum new cards per day
+  dailyLearningLimitMode: DailyLearningLimitMode // preset mode
+  speedOptionsResponsive: boolean // toggles responsive column-to-row breakpoint
   dynamicNewCards: boolean
   newCardsPerDay: number
   targetRetention: string
@@ -48,6 +57,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   cardShuffle: false,
   spacedRepetition: true,
   dailyReviewLimit: 0,
+  dailyLearningLimit: 10,
+  dailyLearningLimitMode: "balanced",
+  speedOptionsResponsive: true,
   dynamicNewCards: true,
   newCardsPerDay: 20,
   targetRetention: "90",
@@ -203,6 +215,49 @@ export function Settings({
               placeholder="0"
             />
           </div>
+        </div>
+
+        {/* Daily Card Learning Limit Row */}
+        <div className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <GraduationCap className="h-4 w-4 text-violet-500 shrink-0" />
+            <label className="text-sm font-semibold text-foreground cursor-pointer truncate" htmlFor="setting-daily-learning-limit">
+              Learning Speed
+            </label>
+            <SettingTooltip text="Controls how many new cards are introduced each day." />
+          </div>
+          <LearningSpeedOptions
+            settings={settings}
+            onUpdateSetting={onUpdateSetting}
+            className="self-stretch sm:self-auto"
+          />
+        </div>
+
+        {/* Responsive Speed Options Toggle Row */}
+        <div className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <Gauge className="h-4 w-4 text-emerald-500 shrink-0" />
+            <label className="text-sm font-semibold text-foreground cursor-pointer truncate" htmlFor="toggle-speed-options-responsive">
+              Responsive Speed Options
+            </label>
+            <SettingTooltip text="Automatically switches speed options from a column on mobile to a row on desktop screens." />
+          </div>
+          <button
+            id="toggle-speed-options-responsive"
+            type="button"
+            role="switch"
+            aria-checked={settings.speedOptionsResponsive !== false}
+            onClick={() => onUpdateSetting("speedOptionsResponsive", settings.speedOptionsResponsive === false)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+              settings.speedOptionsResponsive !== false ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.speedOptionsResponsive !== false ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
         </div>
 
         {/* Dynamic New Cards Row */}

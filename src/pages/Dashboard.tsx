@@ -15,18 +15,27 @@ import {
   Hourglass,
   Dumbbell,
   Maximize2,
-  Zap
+  Zap,
+  GraduationCap,
+  Gauge,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react"
 import type { MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
+import type { SettingsState } from "./Settings"
 import { getAllReviewHistory } from "../lib/historyStorage"
 import { getDashboardStats } from "../lib/statistics"
+import { getNewCardsReviewedTodayCount, getDailyLearningLimit } from "../lib/spacedRepetition"
 import { FullscreenGraphModal } from "../components/modals/FullscreenGraphModal"
 import { ReviewsGraph, MasteryGraph, SpeedGrowthGraph, ReviewHeatmapCalendar, STATUS_METADATA } from "../components/Graphs"
+import { LearningSpeedOptions } from "../components/common/LearningSpeedOptions"
 
 interface DashboardPageProps {
   decks: Deck[]
   totalDue: number
+  settings?: SettingsState
+  onUpdateSetting?: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
   onStartReview: () => void
   onBrowseDecks?: () => void
 }
@@ -35,9 +44,15 @@ interface DashboardPageProps {
 export function Dashboard({
   decks,
   totalDue,
+  settings,
+  onUpdateSetting,
   onStartReview
 }: DashboardPageProps) {
   const [history, setHistory] = useState<ReviewHistoryRecord[]>([])
+
+  const reviewedToday = getNewCardsReviewedTodayCount()
+  const dailyLimit = settings ? getDailyLearningLimit(settings) : 10
+  const isDailyLimitReached = reviewedToday >= dailyLimit
 
   useEffect(() => {
     getAllReviewHistory()
@@ -111,26 +126,37 @@ export function Dashboard({
           </div>
 
           {/* Heading & Actions */}
-          <div className="space-y-3 sm:space-y-4 max-w-lg text-center md:text-left flex flex-col items-center md:items-start">
+          <div className="space-y-3 sm:space-y-4 text-center md:text-left flex flex-col items-center md:items-start flex-1 min-w-0">
             <h2 className="font-display font-extrabold text-xl sm:text-2xl md:text-4xl leading-tight bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
               {totalDue > 0 ? "Ready for your daily review?" : "You are all caught up!"}
             </h2>
-            <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed max-w-md md:max-w-none">
+            <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed max-w-md md:max-w-lg">
               {totalDue > 0
                 ? `You have ${totalDue} card${totalDue > 1 ? "s" : ""} waiting for you. Consistent daily practice is the key to locking information into long-term memory.`
-                : "Excellent work! You have no cards due for review today. Keep the momentum going by exploring your decks or creating new flashcards."}
+                : isDailyLimitReached
+                  ? `You have reached your daily learning limit (${reviewedToday}/${dailyLimit} new cards reviewed today). Increase your daily limit below to unlock more new cards today.`
+                  : "Excellent work! You have no cards due for review today. Keep the momentum going by exploring your decks or creating new flashcards."}
             </p>
-            <div className="w-full sm:w-auto pt-1 sm:pt-2">
+            <div className="w-full pt-1 sm:pt-2 flex flex-col lg:flex-row lg:items-center gap-3">
               <button
                 onClick={onStartReview}
                 disabled={totalDue === 0}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 px-6 py-3 sm:py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 hover:scale-[1.02] transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer group ${totalDue > 0 ? "animate-glow-pulse" : "shadow-md shadow-primary/25"
+                className={`w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-violet-500 px-6 py-3 sm:py-3.5 text-sm font-semibold text-primary-foreground hover:opacity-95 hover:scale-[1.02] transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer group ${totalDue > 0 ? "animate-glow-pulse" : "shadow-md shadow-primary/25"
                   }`}
               >
                 <Play className="h-4.5 w-4.5 fill-current group-hover:scale-110 transition-transform duration-200" />
                 <span>Start Reviewing</span>
                 <ChevronRight className="h-4 w-4 stroke-[2.5] ml-0.5 group-hover:translate-x-1 transition-transform duration-200" />
               </button>
+
+              {onUpdateSetting && (
+                <LearningSpeedOptions
+                  settings={settings}
+                  onUpdateSetting={onUpdateSetting}
+                  showLabel={true}
+                  collapsibleOnMobile={true}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -409,8 +435,8 @@ export function Dashboard({
                     key={interval}
                     onClick={() => setSelectedSpeedGrowthInterval(interval)}
                     className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-200 capitalize cursor-pointer ${selectedSpeedGrowthInterval === interval
-                        ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
-                        : "text-muted-foreground hover:text-foreground"
+                      ? "bg-card text-foreground shadow-xs border border-border/10 font-bold"
+                      : "text-muted-foreground hover:text-foreground"
                       }`}
                   >
                     {interval}
@@ -436,10 +462,10 @@ export function Dashboard({
               <span className="text-xs text-muted-foreground font-medium">Avg Speed Growth</span>
               <span
                 className={`text-sm font-bold font-display ${stats.avgSpeedGrowth > 0
-                    ? "text-emerald-500"
-                    : stats.avgSpeedGrowth < 0
-                      ? "text-rose-500"
-                      : "text-foreground"
+                  ? "text-emerald-500"
+                  : stats.avgSpeedGrowth < 0
+                    ? "text-rose-500"
+                    : "text-foreground"
                   }`}
               >
                 {stats.avgSpeedGrowth > 0 ? `+${stats.avgSpeedGrowth}%` : `${stats.avgSpeedGrowth}%`}

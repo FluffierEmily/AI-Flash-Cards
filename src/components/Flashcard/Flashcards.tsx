@@ -11,7 +11,11 @@ import {
   HelpCircle,
   Settings,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  SlidersHorizontal,
+  GraduationCap,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"
@@ -21,6 +25,7 @@ import { getModelInstance } from "../../lib/ai"
 import { evaluateAnswer, type EvalResult } from "../../lib/aiEvaluation"
 import { ModelSelectorModal } from "../modals/ModelSelectorModal"
 import { PinDecryptModal } from "../modals/PinDecryptModal"
+import { LearningSpeedOptions } from "../common/LearningSpeedOptions"
 
 export interface ReviewSessionItem {
   card: Flashcard
@@ -79,10 +84,88 @@ export interface FlashcardReviewProps {
   onClose: () => void
 }
 
+function DailyLimitButton({
+  settings,
+  onUpdateSetting
+}: {
+  settings: SettingsState
+  onUpdateSetting?: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const currentLimit = settings.dailyLearningLimit ?? 10
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isOpen])
+
+  return (
+    <div className="relative inline-flex items-center" ref={containerRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen((prev) => !prev)
+        }}
+        className="p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
+        title={`Daily Card Learning Limit (${currentLimit}/day). Click to change.`}
+        aria-label="Change daily card learning limit"
+      >
+        <SlidersHorizontal className="h-3 w-3" />
+      </button>
+
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full mt-2 w-64 rounded-2xl border border-border bg-popover/95 backdrop-blur-md p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150 text-left"
+        >
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/60">
+            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <GraduationCap className="h-3.5 w-3.5 text-primary" />
+              Daily Learning Limit
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="p-0.5 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+              aria-label="Close menu"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+
+          <LearningSpeedOptions
+            settings={settings}
+            onUpdateSetting={onUpdateSetting}
+            layout="column"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function FlashcardReview({
   cards = [],
   decks = [],
   settings,
+  onUpdateSetting,
   decryptedKeys,
   setDecryptedKeys,
   onReviewCard,
@@ -434,9 +517,12 @@ export function FlashcardReview({
             <div className="flex items-center justify-between mb-6 relative">
               <div className="flex items-center gap-2">
                 {isReadMode ? (
-                  <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    New Card
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      New Card
+                    </span>
+                    <DailyLimitButton settings={settings} onUpdateSetting={onUpdateSetting} />
+                  </div>
                 ) : currentItem.isImmediateReview ? (
                   <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                     <Zap className="h-3 w-3" />
@@ -618,9 +704,12 @@ export function FlashcardReview({
             <div className="flex items-center justify-between mb-6 relative">
               <div className="flex items-center gap-2">
                 {isReadMode ? (
-                  <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                    New Card
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      New Card
+                    </span>
+                    <DailyLimitButton settings={settings} onUpdateSetting={onUpdateSetting} />
+                  </div>
                 ) : currentItem.isImmediateReview ? (
                   <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                     <Zap className="h-3 w-3" />
