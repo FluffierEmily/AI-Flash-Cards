@@ -42,7 +42,7 @@ export function LearningSpeedOptions({
 
   const isColumn = effectiveLayout === "column"
   const isRow = effectiveLayout === "row"
-  const isResponsive = effectiveLayout === "responsive"
+  // const isResponsive = effectiveLayout === "responsive"
 
   const containerClasses = isColumn
     ? "w-full flex flex-col items-stretch gap-1.5 p-1.5 rounded-xl bg-secondary/40 backdrop-blur-md border border-border/70 shadow-xs"
@@ -124,11 +124,10 @@ export function LearningSpeedOptions({
           >
             <span>{opt.title}</span>
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                isSelected
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${isSelected
                   ? "bg-primary/15 text-primary font-bold"
                   : "bg-muted/80 text-muted-foreground font-semibold"
-              }`}
+                }`}
             >
               {opt.count}
             </span>
@@ -296,9 +295,8 @@ export function LearningSpeedOptions({
             </div>
 
             <ChevronDown
-              className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 shrink-0 ${
-                isMobileExpanded ? "rotate-180" : ""
-              }`}
+              className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 shrink-0 ${isMobileExpanded ? "rotate-180" : ""
+                }`}
             />
           </div>
 
@@ -312,9 +310,8 @@ export function LearningSpeedOptions({
 
       {/* Standard desktop view (or standard non-collapsible mobile view) */}
       <div
-        className={`${containerClasses} ${
-          collapsibleOnMobile ? "hidden sm:inline-flex" : ""
-        }`}
+        className={`${containerClasses} ${collapsibleOnMobile ? "hidden sm:inline-flex" : ""
+          }`}
       >
         {showLabel && renderHeaderLabel()}
         <div className={optionsWrapperClasses}>

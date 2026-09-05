@@ -13,9 +13,7 @@ import {
   ArrowRight,
   BookOpen,
   SlidersHorizontal,
-  GraduationCap,
-  ChevronUp,
-  ChevronDown
+  GraduationCap
 } from "lucide-react"
 import { RichTextEditor } from "../RichTextEditor/RichTextEditor"
 import type { Flashcard } from "./Flashcard"

@@ -17,9 +17,7 @@ import {
   Download,
   Upload,
   Database,
-  GraduationCap,
-  ChevronUp,
-  ChevronDown
+  GraduationCap
 } from "lucide-react"
 
 import { DEFAULT_EVAL_PROMPT } from "../lib/aiEvaluation"
@@ -248,14 +246,12 @@ export function Settings({
             role="switch"
             aria-checked={settings.speedOptionsResponsive !== false}
             onClick={() => onUpdateSetting("speedOptionsResponsive", settings.speedOptionsResponsive === false)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-              settings.speedOptionsResponsive !== false ? "bg-primary" : "bg-muted"
-            }`}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${settings.speedOptionsResponsive !== false ? "bg-primary" : "bg-muted"
+              }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                settings.speedOptionsResponsive !== false ? "translate-x-6" : "translate-x-1"
-              }`}
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.speedOptionsResponsive !== false ? "translate-x-6" : "translate-x-1"
+                }`}
             />
           </button>
         </div>

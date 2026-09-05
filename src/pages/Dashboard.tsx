@@ -15,11 +15,7 @@ import {
   Hourglass,
   Dumbbell,
   Maximize2,
-  Zap,
-  GraduationCap,
-  Gauge,
-  ChevronUp,
-  ChevronDown
+  Zap
 } from "lucide-react"
 import type { MasteryLevel, ReviewHistoryRecord } from "../components/Flashcard/Flashcard"
 import type { Deck } from "../components/Deck/Deck"
