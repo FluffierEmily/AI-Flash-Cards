@@ -32,7 +32,6 @@ export type DailyLearningLimitMode = "balanced" | "advanced" | "challenging" | "
 export interface SettingsState {
   cardShuffle: boolean
   spacedRepetition: boolean
-  dailyReviewLimit: number // 0 = unlimited
   dailyLearningLimit: number // maximum new cards per day
   dailyLearningLimitMode: DailyLearningLimitMode // preset mode
   speedOptionsResponsive: boolean // toggles responsive column-to-row breakpoint
@@ -54,7 +53,6 @@ export interface SettingsState {
 export const DEFAULT_SETTINGS: SettingsState = {
   cardShuffle: false,
   spacedRepetition: true,
-  dailyReviewLimit: 0,
   dailyLearningLimit: 10,
   dailyLearningLimitMode: "balanced",
   speedOptionsResponsive: true,
@@ -189,31 +187,6 @@ export function Settings({
           </button>
         </div>
 
-        {/* Daily Review Limit Row */}
-        <div className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 min-w-0">
-            <Gauge className="h-4 w-4 text-blue-500 shrink-0" />
-            <label className="text-sm font-semibold text-foreground cursor-pointer truncate" htmlFor="input-daily-review-limit">
-              Daily Review Limit
-            </label>
-            <SettingTooltip text="Maximum number of review cards per day. Enter 0 for unlimited." />
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-mono font-medium px-2 py-1 rounded-md bg-muted text-muted-foreground hidden sm:inline-block">
-              {settings.dailyReviewLimit === 0 ? "Unlimited" : `${settings.dailyReviewLimit} cards`}
-            </span>
-            <input
-              id="input-daily-review-limit"
-              type="number"
-              min={0}
-              max={1000}
-              value={settings.dailyReviewLimit}
-              onChange={(e) => onUpdateSetting("dailyReviewLimit", Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-24 h-9 px-3 rounded-xl border border-input bg-card text-foreground font-mono text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary/40"
-              placeholder="0"
-            />
-          </div>
-        </div>
 
         {/* Daily Card Learning Limit Row */}
         <div className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
