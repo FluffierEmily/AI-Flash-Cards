@@ -69,16 +69,42 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Global Ordered List Styling */
+  ol {
+    list-style-type: decimal;
+    padding-left: 1.25rem;
+  }
+
+  ol>li {
+    list-style-type: decimal;
+  }
+
+  /* Nested unordered lists inside ordered lists */
+  ul {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  ul>li {
+    list-style-type: disc;
+  }
 }
 
 @keyframes pulse-slow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.3;
   }
@@ -89,9 +115,12 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 14px 0px rgba(139, 92, 246, 0.35), 0 0 8px rgba(139, 92, 246, 0.2);
   }
+
   50% {
     box-shadow: 0 0 24px 2px rgba(139, 92, 246, 0.55), 0 0 20px rgba(139, 92, 246, 0.4);
   }
@@ -123,6 +152,7 @@
   0% {
     background-position: 200% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -138,9 +168,11 @@
   0% {
     transform: translateX(-150%);
   }
+
   70% {
     transform: translateX(150%);
   }
+
   100% {
     transform: translateX(150%);
   }
