@@ -96,6 +96,15 @@
   ul>li {
     list-style-type: disc;
   }
+
+  p>code {
+    background-color: color-mix(in oklab, hsl(var(--secondary-foreground)) 7%, #5555555e);
+    color: hsl(var(--primary));
+    font-family: monospace;
+    font-size: 0.875em;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+  }
 }
 
 @keyframes pulse-slow {
